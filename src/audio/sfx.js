@@ -11,6 +11,8 @@ const BELL = [[0.5, 0.3, 1.5], [1, 1, 1.3], [1.19, 0.45, 1], [1.5, 0.3, 0.85], [
 const WOOD = [[1, 1, 0.07], [2.57, 0.45, 0.035], [4.2, 0.22, 0.016], [6.1, 0.08, 0.01]]
 const PLASTIC = [[1, 1, 0.026], [2.31, 0.5, 0.016], [3.93, 0.28, 0.01]]
 const COIN_TOP = 3800 // Hz: a coin's upper modes are what makes it sting
+const REGISTER_BELL = [[1, 1, 0.7], [2.04, 0.42, 0.4], [2.76, 0.28, 0.26], [3.62, 0.12, 0.14]] // a small brass bell
+const DRAWER_EVERY = 1100 // ms: buys closer together than this are the key and bell alone
 
 const lastAt = new Map()
 // false if `name` played less than `ms` ago (keeps rapid repeats from stacking).
@@ -34,23 +36,32 @@ function buzz(pattern) {
   }
 }
 
-// The mouse landing on a button: a light tap on a plastic tile.
+// The mouse landing on a button: a fingertip on a wooden tile.
 export function hover() {
-  if (!limit('hover', 40) || !voice(0.06, 1)) return
+  if (!limit('hover', 70) || !voice(0.06, 1)) return
   const t = now()
   const bus = A.ui
-  burst({ t, noise: 'pink', f: vary(1800, 0.1), q: 1, d: 0.005, gain: 0.03, bus })
-  modal({ t, f: vary(1100, 0.06), modes: PLASTIC, gain: 0.045, bus })
+  burst({ t, noise: 'pink', f: vary(1300, 0.1), q: 1, d: 0.005, gain: 0.02, bus })
+  modal({ t, f: vary(780, 0.06), modes: WOOD, gain: 0.06, decay: 0.5, bus })
 }
 
-// A button with nothing to pay for: chunky, a rubbery squish under the click.
+// A window sliding open or shut: a breath of air and the frame coming to rest.
+export function panel(open) {
+  if (!ready() || !voice(0.2, 1)) return
+  const t = now()
+  const bus = A.ui
+  burst({ t, noise: 'pink', f: open ? 420 : 780, f2: open ? 780 : 380, q: 0.7, a: 0.03, d: 0.11, gain: 0.08, bus })
+  modal({ t: t + 0.1, f: vary(open ? 300 : 240, 0.05), modes: WOOD, gain: 0.09, bus })
+}
+
+// A button with nothing to pay for: a chunky wooden key going down.
 export const press = onPress(() => {
   if (!limit('click', 30) || !voice(0.12, 2)) return
   const t = now()
   const bus = A.ui
-  burst({ t, noise: 'pink', f: vary(1700, 0.1), q: 1, d: 0.008, gain: 0.14, bus })
-  modal({ t, f: vary(620, 0.05), modes: PLASTIC, gain: 0.18, bus })
-  tone({ t, f: vary(140, 0.05), f2: 68, d: 0.06, gain: 0.3, bus })
+  burst({ t, noise: 'pink', f: vary(1400, 0.1), q: 1, d: 0.008, gain: 0.1, bus })
+  modal({ t, f: vary(430, 0.05), modes: WOOD, gain: 0.22, bus })
+  tone({ t, f: vary(140, 0.05), f2: 68, d: 0.06, gain: 0.18, bus })
   burst({ t, type: 'lowpass', f: 900, q: 0.6, a: 0.004, d: 0.045, gain: 0.08, bus })
 })
 
@@ -81,10 +92,36 @@ export const deny = onPress(() => {
   buzz(30)
 })
 
-// Bought: a thump, a soft bell, and coins tumbling onto a wooden counter.
+// Bought: an old brass cash register. The key goes down, the lever throws, the bell is struck and
+// bounces, the drawer rolls out on its spring, stops against the frame and the coins settle.
 export const buy = onPress(() => {
   lastAt.set('result', performance.now())
-  if (!limit('buy', 200) || !voice(1.4, 3)) return
+  const rushed = !limit('drawer', DRAWER_EVERY)
+  if (!limit('buy', 140) || !voice(rushed ? 0.7 : 1.1, 3)) return
+  const t = now()
+  const f = vary(1250, 0.012)
+  modal({ t, f: vary(520, 0.06), modes: WOOD, gain: 0.2, strike: 0.07 })
+  burst({ t, type: 'lowpass', f: 600, q: 0.7, d: 0.05, gain: 0.13 })
+  tone({ t, f: 110, f2: 60, d: 0.06, gain: 0.14 })
+  modal({ t: t + 0.055, f: vary(360, 0.06), modes: WOOD, gain: 0.16, strike: 0.04 })
+  modal({ t: t + 0.1, f, modes: REGISTER_BELL, gain: 0.13, beat: 5, strike: 0.04, verb: 0.14, top: COIN_TOP + 800 })
+  modal({ t: t + 0.155, f, modes: REGISTER_BELL, gain: 0.06, beat: 5, decay: 0.8, verb: 0.14, top: COIN_TOP + 800 })
+  buzz([20, 40, 30])
+  if (rushed) return
+  burst({ t: t + 0.17, noise: 'brown', type: 'lowpass', f: 240, q: 0.8, a: 0.03, d: 0.2, gain: 0.5 })
+  burst({ t: t + 0.17, noise: 'pink', f: 520, q: 0.9, a: 0.03, d: 0.16, gain: 0.05 })
+  tone({ t: t + 0.39, f: 92, f2: 50, d: 0.09, gain: 0.2 })
+  modal({ t: t + 0.39, f: vary(175, 0.05), modes: WOOD, gain: 0.26, strike: 0.05 })
+  const n = COARSE_POINTER ? 3 : 5
+  for (let i = 0; i < n; i++) {
+    modal({ t: t + 0.4 + i * 0.03 + rnd(0, 0.015), f: rnd(1100, 1700), modes: COIN, gain: 0.05 * (1 - (i / n) * 0.6), beat: 7, decay: 0.55, pan: rnd(-0.2, 0.2), verb: 0.06, top: COIN_TOP })
+  }
+})
+
+// Something for nothing (the tutorial done, a watched ad): a thump, a soft bell and coins.
+export const reward = onPress(() => {
+  lastAt.set('result', performance.now())
+  if (!limit('reward', 200) || !voice(1.4, 3)) return
   const t = now()
   burst({ t, type: 'lowpass', f: 700, q: 0.7, d: 0.1, gain: 0.32 })
   tone({ t, f: 95, f2: 52, d: 0.1, gain: 0.32 })
@@ -109,6 +146,7 @@ export const gift = onPress(() => {
 
 // Reborn: a great trunk going down far off and a low bell over it.
 export function rebirth() {
+  lastAt.set('result', performance.now())
   if (!ready() || !voice(2.5, 3)) return
   const t = now()
   tone({ t, f: 70, f2: 34, d: 0.9, gain: 0.5, verb: 0.3 })

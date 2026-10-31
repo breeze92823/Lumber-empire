@@ -301,12 +301,8 @@ export function buildYard(scene, lighting, { book = ownBook, remote = false, vie
     pickUpgradeButton: boards.pickUpgradeButton,
     hoverUpgradeButton: boards.hoverUpgradeButton,
     pressUpgradeButton: boards.pressUpgradeButton,
-    // What a stand-in (standIn.js) leaves out: frozen on the road, these would look broken.
-    movers() {
-      const out = [train.model, ...workers.crew.map((w) => w.g)]
-      for (const r of trucks.rigs) if (r.moving) out.push(...r.points)
-      return out
-    },
+    // What a stand-in (standIn.js) leaves out: from afar a yard is just the yard and its machines.
+    movers: () => [train.model, ...items.meshes, ...workers.crew.map((w) => w.g), ...trucks.rigs.flatMap((r) => r.points)],
     // Call between items.begin() and items.end(): it lists what they draw.
     update(dt, elapsed, camera, player) {
       boards.update(dt)

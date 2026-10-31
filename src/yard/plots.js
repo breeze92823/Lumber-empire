@@ -201,10 +201,8 @@ export function createPlots(scene, lighting, concrete) {
     e.shell.parent.add(e.group)
   }
 
-  // What the yard shows now, with empty hands: a crew's load would be left hanging in the air.
   function startBake(e, dt, elapsed, camera) {
     catchUp(e)
-    e.yard.workers.clear()
     step(e, dt, elapsed, camera)
     return bakeYard(e.group, new Set(e.yard.movers()), atlas)
   }
@@ -222,7 +220,7 @@ export function createPlots(scene, lighting, concrete) {
         if (!e.owner || e.live) continue
         e.bakeIn -= dt
         if (baking || e.bakeIn > 0 || !e.shell.visible) continue
-        e.bakeIn = PLOTS.bakeEvery
+        e.bakeIn = Infinity // until its owner buys something, or the viewer has been in it
         baking = { e, job: startBake(e, dt, elapsed, camera) }
       }
     }

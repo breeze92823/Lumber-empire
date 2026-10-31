@@ -1,5 +1,5 @@
 import { Clock, Group, NeutralToneMapping, PCFSoftShadowMap, PerspectiveCamera, Raycaster, Scene, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
-import { CAMERA, graphicsPreset, NET, RENDER, WINDOWS } from './config.js'
+import { CAMERA, GAME, graphicsPreset, NET, RENDER, WINDOWS } from './config.js'
 import * as bloxity from './bloxity.js'
 import { install as installInput, isLocked, onKey, releaseInput, setMouseChop } from './input.js'
 import { installTouch } from './touch.js'
@@ -135,6 +135,14 @@ game.onDraw = remotes.drawHands
 onNetMessage('yardFast', ([slot, frame]) => plots.fast(slot, frame))
 onNetMessage('yardSlow', ([slot, frame]) => plots.slow(slot, frame))
 onNetMessage('leaderboard', (msg) => setLeaders(msg, bloxity.displayName()))
+// The crew works on with the player gone: what it made goes straight in the wallet.
+function payAway(seconds) {
+  if (!(seconds >= GAME.offline.minAway)) return
+  const paid = Math.round(game.crewIncome() * Math.min(seconds, GAME.offline.cap))
+  if (paid <= 0) return
+  hud.earn(paid)
+  windows.away.show(paid, seconds)
+}
 const save = {
   snapshot: () => ({ money: hud.money, earned: career.earned, playtime: Math.floor(career.playtime), crates: hud.crates, tutorial: tutorial.stage, ...game.snapshot(), ...windows.snapshot() }),
   hydrate(doc) {
@@ -145,10 +153,23 @@ const save = {
     game.hydrate(doc)
     windows.hydrate(doc)
     tutorial.hydrate(doc)
+    payAway((doc.serverTime - doc.lastSeen) / 1000) // both the server's clock; the save that follows moves lastSeen on
   },
   plot: () => game.plotState(),
 }
 initNet(save)
+// A hidden tab stops the world but not the seat, so it never comes back through a save.
+{
+  let hiddenAt = Date.now() // a tab can open hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      hiddenAt = Date.now()
+      return
+    }
+    payAway((Date.now() - hiddenAt) / 1000)
+    saveNow()
+  })
+}
 
 // Board buttons and machine signs: a click (Registered in the capture phase so it buys instead of
 // grabbing the cursor) or a tap. With the cursor locked the ray goes through the screen centre.
@@ -156,7 +177,19 @@ initNet(save)
 // up, and only if it stayed put: otherwise it was dragging the camera.
 installAudio()
 installInteract()
-window.addEventListener('click', (e) => e.target.closest?.('button') && sfx.tap())
+// Every button on screen: a tick as the mouse lands on it, a click when it's pressed, unless it played
+// a result of its own (bought, refused). The touch buttons that are the game itself stay out of it.
+{
+  const PRESSABLE = 'button:not(:disabled):not(.jump):not(.sprint):not(.chop)'
+  let over = null
+  window.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return
+    const on = e.target.closest?.(`${PRESSABLE}, .interact.show`) ?? null
+    if (on && on !== over) sfx.hover()
+    over = on
+  })
+  window.addEventListener('click', (e) => e.target.closest?.(PRESSABLE) && sfx.tap())
+}
 {
   const canvas = renderer.domElement
   const raycaster = new Raycaster()
@@ -412,5 +445,5 @@ if (import.meta.env.DEV) {
     resetPlayer({ x, y, z }, facing)
     syncYawToPlayer()
   }
-  window.__game = { player, scene, renderer, camera, postfx, yard, hud, windows, lighting, bodies: bodyCount, toggleMode, teleport, game, tutorial, soundscape, plots, remotes, net, saveNow, frame, save }
+  window.__game = { player, scene, renderer, camera, postfx, yard, hud, windows, lighting, bodies: bodyCount, toggleMode, teleport, game, tutorial, soundscape, plots, remotes, net, saveNow, frame, save, payAway }
 }

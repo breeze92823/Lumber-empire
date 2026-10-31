@@ -46,15 +46,6 @@ export const ICONS = {
     <rect x="28" y="16" width="46" height="70" rx="3" fill="none" stroke="#f0c43a" stroke-width="3"/>
     <rect x="35" y="25" width="32" height="21" rx="3" fill="#1a43b5"/><rect x="35" y="67" width="32" height="9" rx="2" fill="#dfe9ff"/></g>`,
   ),
-  // Open chest spilling cash.
-  chest: svg(
-    `<defs>${gradient('t-g', [[0, '#ffd34a'], [1, '#e08a12']])}</defs>
-    <path d="M14 42c0-22 12-32 36-32s36 10 36 32l-12 4H24z" fill="url(#t-g)" stroke="#8a4a0a" stroke-width="3.5"/>
-    <path d="M12 54h76v32a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8z" fill="url(#t-g)" stroke="#8a4a0a" stroke-width="3.5"/>
-    <path d="M8 46c14-12 28-8 42-8s28-4 42 8l-4 10H12z" fill="#49c94a" stroke="#14601f" stroke-width="3"/>
-    <g fill="#ff5ca8"><rect x="22" y="44" width="8" height="5" rx="1"/><rect x="44" y="40" width="8" height="5" rx="1"/><rect x="66" y="44" width="8" height="5" rx="1"/></g>
-    <g fill="#d6ffb8"><rect x="32" y="46" width="9" height="5" rx="1"/><rect x="55" y="46" width="9" height="5" rx="1"/></g>`,
-  ),
   envelope: svg(
     `<defs>${gradient('e-p', [[0, '#fff0d4'], [1, '#f2cfa0']])}</defs>
     <g transform="rotate(-4 50 50)"><rect x="6" y="18" width="88" height="66" rx="6" fill="url(#e-p)" stroke="#a85a1a" stroke-width="4"/>

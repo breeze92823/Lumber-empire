@@ -53,7 +53,6 @@ export function createGifts(hud) {
   const claimAll = win.body.querySelector('.gf-all')
 
   function claim(list) {
-    sfx.gift()
     for (const g of list) {
       claimed.add(g)
       hud.addMoney(g.money ?? 0)
@@ -81,18 +80,23 @@ export function createGifts(hud) {
     barFill.style.width = `${next ? ((time - from) / (next.at - from)) * 100 : 100}%`
   }
 
+  const open = (list) => {
+    sfx.gift()
+    claim(list)
+  }
   entries.forEach(({ g, el }) =>
-    el.addEventListener('click', () => (ready(g) ? claim([g]) : replay(el, 'uiw-shake'))),
+    el.addEventListener('click', () => (ready(g) ? open([g]) : replay(el, 'uiw-shake'))),
   )
   claimAll.addEventListener('click', () => {
     const list = gifts.filter(ready)
-    if (list.length) claim(list)
+    if (list.length) open(list)
     else replay(claimAll, 'uiw-shake')
   })
   const openAll = win.overlay.querySelector('.gf-robux')
   openAll.addEventListener('click', () => {
     if (hud.money < openAllCost) return replay(openAll, 'uiw-shake')
     hud.addMoney(-openAllCost)
+    sfx.buy()
     claim(gifts.filter((g) => !claimed.has(g)))
   })
 

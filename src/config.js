@@ -33,7 +33,7 @@ export const NET = {
   poseHz: 10,
   remoteLerp: 10,
   predictMax: 0.4,
-  avatarFade: 160, // m: a remote player further off than this isn't drawn
+  avatarFade: 60, // m: a remote player further off than this isn't drawn
   // The live yard (yard/sync.js): the crew every `fastEvery` s, belts, logs and trucks every
   // `slowEvery` s, and the yard's purchases, checked every `plotEvery` s.
   fastEvery: 0.2,
@@ -64,8 +64,7 @@ export const PLOTS = {
   liveRange: 14, // m from that box: closer and the real yard comes in...
   liveLeave: 22, // ...until the viewer is this far out again
   bakeBudget: 25000, // vertices a frame a stand-in copies, so taking a new one is never a hitch
-  bakeEvery: 15, // s between a stand-in's retakes, so its piles and trees keep up
-  bakeSoon: 1, // s from a purchase to a retake
+  bakeSoon: 1, // s from a purchase, or the viewer leaving, to a new stand-in
   atlas: { size: 2048, cell: 256, phone: 1024 }, // px: the stand-ins' shared pictures
   nameY: 17, // m: the owner's name over a yard
   nameHeight: 2.6,
@@ -527,6 +526,11 @@ export const GAME = {
   workshopTiers: { tables: 'table', beds: 'bed' },
   rebirthCash: 2, // every rebirth multiplies all sales by this
 
+  // The crew's pay while the player is gone (game.crewIncome). `share` of what the yard would have
+  // made, for at most `cap` s; under `minAway` s away is nothing. `trip` = m a worker walks per load,
+  // the felling included, measured off a fixed-step run of the yard.
+  offline: { share: 0.5, cap: 8 * 3600, minAway: 60, trip: 60 },
+
   // The line: south down the east of the concrete, then west along its south edge (`path`,
   // [x, z] corners from the head of the first belt). `mouth` = m from a machine's centre to
   // where an item goes in or comes out, `belt` = m to the end of its outgoing belt, `time` = s
@@ -652,8 +656,9 @@ export const GAME = {
   },
 
   // The crew crosses the line round its north end: `passage` is the two corners. Every
-  // `haulEvery`-th worker hauls pallets before anything else.
-  crew: { passage: [[16.2, -20.4], [8.4, -20.4]], stand: 1.7, hitEvery: 0.65, haulEvery: 3, pickRange: 9, tipEvery: 0.25, standTruck: 1.4 },
+  // `haulEvery`-th worker hauls pallets before anything else, and once a pallet holds `haulAt`
+  // items all of them do: goods waiting there earn nothing, more logs only add to the wait.
+  crew: { passage: [[16.2, -20.4], [8.4, -20.4]], stand: 1.7, hitEvery: 0.65, haulEvery: 3, haulAt: 3, pickRange: 9, tipEvery: 0.25, standTruck: 1.4 },
   haunt: { multiplier: 2, foliage: '#9a5cff', log: '#c29aff' },
   rainbowSpeed: 0.25, // hue turns per second of a Rainbow Tree and its logs
   chips: { count: 80, life: 0.7, gravity: 16, size: 0.16, perHit: 7 },
@@ -1002,14 +1007,9 @@ export const SETTINGS = {
   master_volume: { def: '80', type: 'number', min: 0, max: 100 },
 }
 
-// Boxity's ads (bloxity.js). The FREE REWARDS button: `placement` is lowercase, digits and hyphens,
-// and the ad gives x2 Money for `seconds` (a guess). Screen ads sit on the edges round a window, so
-// a screen narrower than `panelMinWidth` px, with no edges to spare, shows none.
+// Boxity's ads (bloxity.js). Screen ads sit on the edges round a window, so a screen narrower than
+// `panelMinWidth` px, with no edges to spare, shows none.
 export const ADS = {
-  placement: 'x2-money',
-  seconds: 120,
-  claimTimeout: 8, // s to wait for the server's check of a watched ad
-  checkEvery: 1, // s between asking whether a rewarded ad can play
   panelMinWidth: 900,
 }
 

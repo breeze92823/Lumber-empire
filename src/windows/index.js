@@ -1,5 +1,6 @@
 import { YARD } from '../config.js'
 import { player } from '../player.js'
+import { createAway } from './away.js'
 import { createCollection } from './collection.js'
 import { createDepot } from './depot.js'
 import { createGifts } from './gifts.js'
@@ -19,6 +20,7 @@ export function createWindows(hud, onHire, buyUpgrade, onRebirth) {
   })
   const collection = createCollection()
   const depot = createDepot(hud, buyUpgrade)
+  const away = createAway()
 
   const tiles = { '.tile-gifts': gifts, '.tile-rebirth': rebirth, '.tile-index': collection }
   for (const [selector, win] of Object.entries(tiles)) {
@@ -32,6 +34,7 @@ export function createWindows(hud, onHire, buyUpgrade, onRebirth) {
     collection,
     hire,
     depot,
+    away,
     snapshot: () => ({ ...hire.snapshot(), ...gifts.snapshot() }),
     hydrate(doc) {
       rebirth.hydrate(doc.rebirths ?? 0)

@@ -1,7 +1,5 @@
-import { ADS, SHOP, YARD } from './config.js'
-import { canShowRewarded, showRewarded } from './bloxity.js'
+import { SHOP, YARD } from './config.js'
 import { clock, shortMoney } from './hud.js'
-import { claimAdReward, net } from './net.js'
 import { registerZone } from './interact.js'
 import { player } from './player.js'
 import { setUpgrade, upgradeLevel } from './stats.js'
@@ -68,31 +66,6 @@ export function createShop({ yard, hud }) {
     }
   }
 
-  // FREE REWARDS: a watched ad is a stretch of x2 Money. The server asks Boxity whether the ad was
-  // really watched; a Create preview's test ad can't be checked, so it just pays.
-  let watching = false
-  let adCheckLeft = 0
-  hud.onRewards = async () => {
-    if (watching) return
-    if (left.x2Money > 0) return sfx.deny()
-    if (!net.connected) return hud.notify('Connecting, try again in a moment')
-    watching = true
-    try {
-      const ad = await showRewarded(ADS.placement)
-      if (ad.status === 'no-fill') hud.notify('No ad right now, try again soon')
-      if (ad.status !== 'completed') return
-      if (ad.test || (await claimAdReward(ad.rewardToken))) {
-        left.x2Money = ADS.seconds
-        hud.notify(`${SHOP.x2Money.title} for ${clock(ADS.seconds)}!`)
-        sfx.buy()
-      } else {
-        hud.notify('That ad could not be checked')
-      }
-    } finally {
-      watching = false
-    }
-  }
-
   // Hacker / OP Truck rings: "Press E to buy ..." while standing in an unbought one.
   const perkAt = () => {
     const p = player.position
@@ -122,9 +95,13 @@ export function createShop({ yard, hud }) {
   const tag = (id) => (left[id] > 0 ? clock(Math.ceil(left[id])) : shortMoney(price(id)))
 
   return {
+    // What every sale is multiplied by for good.
+    get lastingCash() {
+      return owned.has('hacker') ? SHOP.hacker.cash : 1
+    },
     // What every sale is multiplied by right now.
     get cash() {
-      return (owned.has('hacker') ? SHOP.hacker.cash : 1) * boost('x2Money') * boost('rush') * hud.friendCash
+      return this.lastingCash * boost('x2Money') * boost('rush') * hud.friendCash
     },
     get autoChop() {
       return autoChop
@@ -148,10 +125,6 @@ export function createShop({ yard, hud }) {
     },
     update(dt) {
       updateBoosts(dt)
-      if ((adCheckLeft -= dt) <= 0) {
-        adCheckLeft = ADS.checkEvery
-        hud.showRewards(canShowRewarded())
-      }
       hud.showPerk('x2Money', tag('x2Money'))
       hud.showPerk('rush', tag('rush'))
       hud.showPerk('autoChop', owned.has('autoChop') ? (autoChop ? 'ON' : 'OFF') : shortMoney(price('autoChop')))

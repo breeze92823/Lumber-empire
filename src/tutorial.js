@@ -96,7 +96,7 @@ export function createTutorial({ scene, game, hud, yard, loaded, onStage }) {
     doneLeft = TUTORIAL.doneTime
     showCard(TUTORIAL.done)
     card.classList.add('done')
-    sfx.buy()
+    sfx.reward()
   }
 
   // Saved like a finish: a skipped tutorial never comes back. Logs over the limit stay in hand

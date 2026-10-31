@@ -395,23 +395,6 @@ export function refreshFriends(every) {
 }
 
 // --- Ads --------------------------------------------------------------
-export function canShowRewarded() {
-  try {
-    return !!sdk()?.ads?.isAvailable?.()
-  } catch {
-    return false
-  }
-}
-
-// { status, rewardToken?, test? }: only 'completed' earns the reward. Never rejects.
-export async function showRewarded(placement) {
-  try {
-    return (await sdk()?.ads?.showRewarded?.(placement)) ?? { status: 'disabled' }
-  } catch {
-    return { status: 'error' }
-  }
-}
-
 // Banners for a screen of ours while it is open, on the edges round it.
 export function showPanelAds(on) {
   try {

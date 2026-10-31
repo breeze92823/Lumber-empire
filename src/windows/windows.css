@@ -755,6 +755,70 @@
   -webkit-text-stroke: calc(5 * var(--u)) #3a3a3a;
 }
 
+/* --- Welcome Back ---------------------------------------------------------------- */
+.w-away {
+  --banner: linear-gradient(100deg, #2fc92a, #8cf25a 32%, #38d030 55%, #8cf25a 80%, #2fc92a);
+  --title-edge: #14601c;
+  --h: 545;
+}
+.w-away .uiw-banner {
+  justify-content: center;
+  padding-right: calc(84 * var(--u));
+}
+.w-away .uiw-frame {
+  background: none;
+}
+.w-away .uiw-title {
+  font-size: calc(60 * var(--u));
+}
+.w-away .uiw-body {
+  align-items: center;
+  background: rgba(58, 56, 54, 0.94);
+}
+.aw-face {
+  flex: none;
+  display: block;
+  width: calc(130 * var(--u));
+  height: calc(130 * var(--u));
+  margin-top: calc(24 * var(--u));
+  overflow: hidden;
+  border: calc(3 * var(--u)) solid #fff;
+  border-radius: 50%;
+  background: #2f2e2c;
+}
+.aw-face svg {
+  width: 112%;
+  height: 112%;
+  margin: 2% 0 0 -6%;
+}
+.aw-note {
+  margin-top: calc(10 * var(--u));
+  padding: 0 calc(16 * var(--u));
+  font-size: calc(27 * var(--u));
+  line-height: 1.15;
+  text-align: center;
+  -webkit-text-stroke: calc(5 * var(--u)) #000;
+}
+.aw-note b {
+  color: #ffd84a;
+}
+.aw-paid {
+  margin-top: calc(10 * var(--u));
+  color: #b8e81a;
+  font-size: calc(72 * var(--u));
+  -webkit-text-stroke: calc(10 * var(--u)) #2a6a12;
+}
+.aw-go {
+  width: calc(258 * var(--u));
+  height: calc(62 * var(--u));
+  margin: calc(16 * var(--u)) 0;
+  border: calc(3 * var(--u)) solid #b8f0a8;
+  outline: calc(2 * var(--u)) solid #14601c;
+  background: linear-gradient(115deg, #2fc92a, #66ec3a 45%, #22b82a);
+  font-size: calc(46 * var(--u));
+  -webkit-text-stroke: calc(8 * var(--u)) #0d5a1a;
+}
+
 /* --- Truck Depot ---------------------------------------------------------------- */
 .dp-top {
   display: flex;
@@ -922,11 +986,13 @@
     font-size: calc(58 * var(--u));
   }
   .w-hire .uiw-title,
-  .w-depot .uiw-title {
+  .w-depot .uiw-title,
+  .w-away .uiw-title {
     font-size: calc(46 * var(--u));
   }
   .w-hire .uiw-banner,
-  .w-depot .uiw-banner {
+  .w-depot .uiw-banner,
+  .w-away .uiw-banner {
     padding-right: calc(16 * var(--u));
   }
   .uiw-close {
@@ -970,6 +1036,9 @@
     font-size: calc(44 * var(--u));
   }
 
+  .uiw.w-away {
+    --h: 530;
+  }
   .uiw.w-rebirth {
     --h: 470;
   }

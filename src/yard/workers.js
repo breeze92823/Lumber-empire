@@ -225,6 +225,15 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
     return best
   }
 
+  // A few goods waiting on a pallet: delivering them comes before more wood.
+  const piledUp = () => stages.some((s) => s.owned && s.workers && s.stock.length >= C.haulAt)
+
+  // Logs on their way to the pile in someone else's hands, so it isn't over-filled.
+  function logsComing(w) {
+    if (!debarker.owned) return 0
+    return crew.reduce((n, o) => (o === w ? n : o.job === 'pick' ? n + stats.workerCarry : o.load[0]?.kind === 'log' ? n + o.load.length : n), 0)
+  }
+
   // The next machine a pallet's goods can be carried to, if nothing else takes them there.
   function carryOn(s) {
     const next = lines[s.floor].stages[s.index + 1]
@@ -266,7 +275,7 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
       return true
     },
     logs(w) {
-      if (!debarker.workers || line.roomForLogs <= 0) return false
+      if (!debarker.workers || line.roomForLogs - logsComing(w) <= 0) return false
       const log = forest.nearestLog(w.g.position.x, w.g.position.z)
       if (!log) return false
       log.claim = w
@@ -292,8 +301,7 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
   function think(w) {
     if (w.next?.owned && w.load.length) return goFeed(w)
     if (w.load.length) return debarker.owned && w.load[0].kind === 'log' ? goLoad(w) : goSell(w)
-    // A full pallet stops the line behind it, so then everyone hauls.
-    const hauler = w.index % C.haulEvery === C.haulEvery - 1 || stages.some((s) => s.stock.length >= L.dockMax)
+    const hauler = w.index % C.haulEvery === C.haulEvery - 1 || piledUp()
     const order = hauler ? ['haul', 'logs', 'fell'] : ['logs', 'fell', 'haul']
     if (order.some((job) => JOBS[job](w))) return undefined
     if (w.job === 'wait') return undefined
@@ -397,6 +405,11 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
       w.beat -= dt
       if (w.truck === train && !train.accepting) {
         w.job = null
+        return
+      }
+      // This truck has gone: don't stand waiting for it while another is in.
+      if (!w.truck.ready && w.truck !== train && trucks.list.some((t) => t.ready)) {
+        goSell(w)
         return
       }
       if (w.beat > 0 || !w.truck.ready) return

@@ -339,40 +339,6 @@
   width: calc(40 * var(--u));
   height: calc(44 * var(--u));
 }
-.hud-rewards {
-  align-self: flex-end;
-  width: calc(130 * var(--u));
-  height: calc(100 * var(--u));
-  margin-top: calc(44 * var(--u));
-  margin-right: calc(-34 * var(--u));
-}
-.hud-rewards-icon {
-  position: absolute;
-  left: 50%;
-  bottom: calc(14 * var(--u));
-  width: calc(88 * var(--u));
-  height: calc(88 * var(--u));
-  transform: translateX(-50%);
-  filter: drop-shadow(0 0 calc(12 * var(--u)) rgba(70, 255, 130, 0.8));
-}
-.hud-rewards .hud-alert {
-  top: calc(-10 * var(--u));
-  right: calc(0 * var(--u));
-  width: calc(38 * var(--u));
-  height: calc(38 * var(--u));
-  font-size: calc(26 * var(--u));
-}
-.hud-rewards-text {
-  position: absolute;
-  left: 50%;
-  bottom: calc(-4 * var(--u));
-  transform: translateX(-50%);
-  white-space: nowrap;
-  color: #c9ffd0;
-  font-size: max(9px, calc(17 * var(--u)));
-  -webkit-text-stroke: calc(5 * var(--u)) #0d5a24;
-  paint-order: stroke fill;
-}
 
 /* --- Bottom --------------------------------------------------------------------- */
 .hud-bottom {
@@ -542,14 +508,12 @@
 }
 
 /* --- Touch: tap targets, and clear of the joystick, the thumb arc and the top buttons ---- */
-.touch-ui .hud-rewards,
 .touch-ui .hud-slot,
 .touch-ui .hud-x2,
 .touch-ui .hud-auto,
 .touch-ui .hud-home {
   min-height: 44px;
 }
-.touch-ui .hud-rewards,
 .touch-ui .hud-slot {
   min-width: 44px;
 }
@@ -642,9 +606,6 @@
     right: calc(var(--sr) + 8px);
     top: calc(max(var(--res-top), var(--st)) + 4px + var(--train-h));
   }
-  .hud-rewards {
-    margin-right: 0;
-  }
   .hud-fps,
   .touch-ui .hud-fps {
     right: calc(var(--sr) + 16px + 232 * var(--ur));
@@ -730,12 +691,6 @@
   .touch-ui .hud-right {
     right: calc(var(--sr) + 8px);
     top: calc(var(--st) + 62px);
-  }
-  .hud-rewards {
-    position: absolute;
-    right: 100%;
-    bottom: 0;
-    margin: 0 calc(8 * var(--u)) 0 0;
   }
   .hud-bottom,
   .touch-ui .hud-bottom {

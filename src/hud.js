@@ -6,8 +6,8 @@ import { career } from './stats.js'
 // The on-screen HUD. Everything is sized in reference-screenshot pixels times --u
 // (set on resize), so the layout holds from phones to desktop. Live: the train timer,
 // the wallet with its gains, the hotbar's crates (fed by windows/), what the player carries,
-// the first-steps hint and short notices. The Axe slot reports to `onAxe`. Auto Chop, x2 Money and Rush Hour report to `onPerk` and
-// FREE REWARDS to `onRewards` (shop.js); Settings opens Boxity's menu.
+// the first-steps hint and short notices. The Axe slot reports to `onAxe`. Auto Chop, x2 Money and Rush Hour report to `onPerk`
+// (shop.js); Settings opens Boxity's menu.
 // Boxity draws its own toolbar top-left, so nothing here goes in that corner.
 const REF = { w: 1920, h: 985, portraitW: 900 }
 const MIN_SCALE = COARSE_POINTER ? 0.46 : 0.36 // on touch, keeps every tile at least 44 px tall
@@ -65,11 +65,6 @@ export function createHud({ onTrain, onHome, onMenu }) {
       <button class="hud-btn hud-x2" type="button" aria-label="x2 Money">
         <span class="hud-x2-text">x2 Money</span>
         <span class="hud-x2-coin"><b></b></span>
-      </button>
-      <button class="hud-btn hud-rewards" type="button" aria-label="Free Rewards">
-        <span class="hud-alert">!</span>
-        <span class="hud-rewards-icon">${ICONS.chest}</span>
-        <span class="hud-rewards-text">FREE REWARDS</span>
       </button>
     </div>
 
@@ -144,9 +139,6 @@ export function createHud({ onTrain, onHome, onMenu }) {
   axeSlot.addEventListener('click', () => out.onAxe?.())
   root.querySelector('.hud-home').addEventListener('click', () => onHome?.())
   root.querySelector('.tile-settings').addEventListener('click', () => onMenu?.())
-  const rewards = root.querySelector('.hud-rewards')
-  rewards.style.display = 'none' // until an ad can play
-  rewards.addEventListener('click', () => out.onRewards?.())
   const friendText = root.querySelector('.hud-boost span')
   let friendPercent = 0
   const fps = root.querySelector('.hud-fps')
@@ -164,7 +156,6 @@ export function createHud({ onTrain, onHome, onMenu }) {
   const out = {
     root,
     onPerk: null,
-    onRewards: null,
     onAxe: null,
     setAxe(on) {
       axeSlot.classList.toggle('on', on)
@@ -172,9 +163,6 @@ export function createHud({ onTrain, onHome, onMenu }) {
     setReserved(areas) {
       reserved = areas
       resize()
-    },
-    showRewards(on) {
-      rewards.style.display = on ? '' : 'none'
     },
     showFps(on) {
       fps.hidden = !on
