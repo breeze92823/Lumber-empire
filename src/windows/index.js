@@ -17,6 +17,8 @@ export function createWindows(hud, onHire, buyUpgrade, onRebirth) {
   const rebirth = createRebirth(hud, (n, skipped) => {
     hire.raiseMax()
     onRebirth(n, skipped)
+    // The crew goes with the plot: rebirth n leaves n workers.
+    if (!skipped) hire.reset(n)
   })
   const collection = createCollection()
   const depot = createDepot(hud, buyUpgrade)

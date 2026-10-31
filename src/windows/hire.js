@@ -62,6 +62,13 @@ export function createHire(hud, onHire) {
       maxWorkers += by
       render()
     },
+    // A rebirth: the crew drops to `n` and hiring starts over at the first price.
+    reset(n) {
+      workers = n
+      price = WINDOWS.hire.price
+      onHire(workers)
+      render()
+    },
     get workers() {
       return workers
     },

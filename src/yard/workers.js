@@ -430,6 +430,8 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
     pace: 1, // Rush Hour
     setCount(n) {
       while (crew.length < n) hire()
+      // A rebirth sends the extra hands home; clear() has already let go of their trees and logs.
+      while (crew.length > n) scene.remove(crew.pop().g)
     },
     // The crew as buildPuppets' pose numbers.
     snapshot(code) {
