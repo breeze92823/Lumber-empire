@@ -93,7 +93,7 @@ const world = createWorld(scene) // the clouds
 const concrete = buildGround(scene, yardContacts())
 landColliders()
 const yard = buildYard(scene, lighting)
-const hud = createHud({ onTrain: yard.sendTrain })
+const hud = createHud({ onTrain: yard.sendTrain, onHome: respawn })
 const windows = createWindows(
   hud,
   yard.workers.setCount,
