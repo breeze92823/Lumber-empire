@@ -22,7 +22,8 @@ import { createRemotePlayers } from './remotePlayers.js'
 import { createBubble } from './bubble.js'
 import { installAudio, setAdBreak, setVolume } from './audio/core.js'
 import * as sfx from './audio/sfx.js'
-import { closeTopWindow, createWindows, setWindowReserved } from './windows/index.js'
+import { installInteract, setInteractEnabled, updateInteract } from './interact.js'
+import { anyWindowOpen, closeTopWindow, createWindows, setWindowReserved } from './windows/index.js'
 import { setParticleDensity, updateParticles } from './particles.js'
 import { createPostFx } from './postfx.js'
 import { setNeonBloom } from './propkit.js'
@@ -139,6 +140,7 @@ initNet(save)
 // Anywhere else a mouse button held on the world swings the axe. A finger only presses on the way
 // up, and only if it stayed put: otherwise it was dragging the camera.
 installAudio()
+installInteract()
 {
   const canvas = renderer.domElement
   const raycaster = new Raycaster()
@@ -335,6 +337,8 @@ function frame() {
   updateCamera(camera, dt)
   world.update(dt, elapsed)
   game.update(dt, elapsed, camera)
+  setInteractEnabled(!anyWindowOpen())
+  updateInteract()
   hud.update(dt)
   // The floating "!" over the Trucks kiosk and the Workers stall: only while the wallet covers something there.
   const trucksCost = Math.min(upgradeCost('truckLevel') ?? Infinity, upgradeCost('delivery') ?? Infinity)

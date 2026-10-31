@@ -1031,3 +1031,6 @@ export function coerceSetting(key, raw) {
   const n = Number(value)
   return clamp(Number.isFinite(n) ? n : Number(spec.def), spec.min, spec.max)
 }
+
+// Hold-E prompt at the BUY rings (and the Hacker / OP Truck rings): hold E this long to buy.
+export const INTERACT = { holdMs: 600, key: 'KeyE' }

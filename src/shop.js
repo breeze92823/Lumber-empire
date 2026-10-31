@@ -2,6 +2,7 @@ import { ADS, SHOP, YARD } from './config.js'
 import { canShowRewarded, showRewarded } from './bloxity.js'
 import { clock, shortMoney } from './hud.js'
 import { claimAdReward, net } from './net.js'
+import { registerZone } from './interact.js'
 import { player } from './player.js'
 import { setUpgrade, upgradeLevel } from './stats.js'
 import * as sfx from './audio/sfx.js'
@@ -92,14 +93,20 @@ export function createShop({ yard, hud }) {
     }
   }
 
-  function updateRings() {
+  // Hacker / OP Truck rings: "Press E to buy ..." while standing in an unbought one.
+  const perkAt = () => {
     const p = player.position
-    for (const ring of rings) {
-      const now = p.y < 1 && Math.hypot(ring.spec.x - p.x, ring.spec.z - p.z) < ring.spec.r
-      if (now && !ring.inside) buyPerk(ring.spec.perk)
-      ring.inside = now
-    }
+    return rings.find((r) => !owned.has(r.spec.perk) && p.y < 1 && Math.hypot(r.spec.x - p.x, r.spec.z - p.z) < r.spec.r)
   }
+  registerZone({
+    id: 'perkRing',
+    isNear: () => !!perkAt(),
+    label: () => `buy ${SHOP[perkAt().spec.perk].title} (${shortMoney(price(perkAt().spec.perk))})`,
+    onConfirm() {
+      const ring = perkAt()
+      if (ring) buyPerk(ring.spec.perk)
+    },
+  })
 
   function updateBoosts(dt) {
     for (const id of Object.keys(left)) {
@@ -140,7 +147,6 @@ export function createShop({ yard, hud }) {
       if (owned.has('opTruck') && level !== OP_LEVEL) setUpgrade('truckLevel', OP_LEVEL)
     },
     update(dt) {
-      updateRings()
       updateBoosts(dt)
       if ((adCheckLeft -= dt) <= 0) {
         adCheckLeft = ADS.checkEvery

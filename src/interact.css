@@ -1,0 +1,72 @@
+/* Hold-E prompt (ported from Bowling-roll). */
+.interact {
+  position: fixed;
+  left: 50%;
+  bottom: calc(26% + env(safe-area-inset-bottom));
+  transform: translateX(-50%) scale(0.9);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px 8px 8px;
+  border-radius: 999px;
+  background: rgba(12, 18, 34, 0.72);
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 30;
+  touch-action: none;
+  user-select: none;
+}
+.interact.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) scale(1);
+}
+.interact-key {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.interact-key span {
+  font-family: Fredoka, 'Arial Black', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #fff;
+  color: #101420;
+  display: grid;
+  place-items: center;
+}
+.interact.held .interact-key span {
+  transform: scale(0.9);
+}
+.interact-key svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.interact-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 4;
+}
+.interact-ring {
+  fill: none;
+  stroke: #46e04a;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.interact-text {
+  font-family: Fredoka, 'Arial Black', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(15px, 2.2vw, 20px);
+  white-space: nowrap;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 0.18em #101420;
+}
