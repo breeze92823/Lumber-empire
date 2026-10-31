@@ -25,7 +25,7 @@ const tile =(cls, icon, text, alert = false) => `
     <span class="hud-tile-icon">${icon}</span><span class="hud-tile-text">${text}</span>
   </button>`
 
-export function createHud({ onTrain }) {
+export function createHud({ onTrain, onHome }) {
   const root = document.createElement('div')
   root.className = 'hud'
   root.innerHTML = `
@@ -68,12 +68,15 @@ export function createHud({ onTrain }) {
     </div>
 
     <div class="hud-bottom">
-      <button class="hud-btn hud-auto" type="button" aria-label="Auto Chop">
-        <span class="hud-best">BEST VALUE!</span>
-        <span class="hud-auto-axe">${ICONS.axe}</span>
-        <span class="hud-auto-text">AUTO CHOP</span>
-        <span class="hud-auto-coin"><b></b></span>
-      </button>
+      <div class="hud-bottom-row">
+        <button class="hud-btn hud-auto" type="button" aria-label="Auto Chop">
+          <span class="hud-best">BEST VALUE!</span>
+          <span class="hud-auto-axe">${ICONS.axe}</span>
+          <span class="hud-auto-text">AUTO CHOP</span>
+          <span class="hud-auto-coin"><b></b></span>
+        </button>
+        <button class="hud-btn hud-home" type="button" aria-label="Go to my lumber yard">MY YARD</button>
+      </div>
       <div class="hud-hotbar">
         ${HUD.hotbar.map(slot).join('')}
       </div>
@@ -110,6 +113,8 @@ export function createHud({ onTrain }) {
   walletText.textContent = moneyText(cash)
   let crates = 0
   let crateSlot = null
+
+  root.querySelector('.hud-home').addEventListener('click', () => onHome?.())
 
   const perks = {}
   for (const [id, cls] of [['rush', 'rush'], ['x2Money', 'x2'], ['autoChop', 'auto']]) {
