@@ -34,9 +34,6 @@ export function createGame({ yard, hud }) {
   let handsLeft = 0 // s until the next item can move in or out of the hands
   let priceCheck = 0
   let nearTree = false
-  let felled = 0 // towards the next haunting
-  let hauntLeft = 0
-  let shownHaunt = -1
   let sold = false
   const told = new Map() // complaint -> s left before it may repeat
 
@@ -56,7 +53,6 @@ export function createGame({ yard, hud }) {
     }
     boards.repaint()
     boards.refreshPrices(hud.money)
-    paintHaunt()
   }
 
   // Tries to buy a sign's item: 'buy' or 'deny'.
@@ -87,45 +83,7 @@ export function createGame({ yard, hud }) {
     return 'buy'
   }
 
-  // --- The haunting -----------------------------------------------------------------
-  function paintHaunt() {
-    const { top } = YARD.eventBoard
-    if (hauntLeft > 0) {
-      const s = Math.ceil(hauntLeft)
-      top.progress = `HAUNTED! ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} LEFT`
-      top.fill = hauntLeft / stats.hauntTime
-    } else {
-      const needed = Math.max(1, stats.treesNeeded - felled)
-      top.progress = `${needed} TREES UNTIL HAUNTED!`
-      top.fill = felled / stats.treesNeeded
-    }
-    boards.repaintEvent()
-  }
-
-  forest.onDown = () => {
-    sfx.fall()
-    if (hauntLeft > 0) return
-    felled++
-    if (felled >= stats.treesNeeded) {
-      felled = 0
-      hauntLeft = stats.hauntTime
-      shownHaunt = -1
-      forest.setHaunted(true)
-    }
-    paintHaunt()
-  }
-
-  function updateHaunt(dt) {
-    if (hauntLeft <= 0) return
-    hauntLeft -= dt
-    if (hauntLeft <= 0) {
-      forest.setHaunted(false)
-      paintHaunt()
-    } else if (Math.ceil(hauntLeft) !== shownHaunt) {
-      shownHaunt = Math.ceil(hauntLeft)
-      paintHaunt()
-    }
-  }
+  forest.onDown = () => sfx.fall()
 
   // --- The axe ----------------------------------------------------------------------
   function updateAxe(dt) {
@@ -301,8 +259,6 @@ export function createGame({ yard, hud }) {
   }
   trucks.onLucky = ({ name, mult }) => hud.notify(`A ${name} TRUCK pulled in! Everything on it pays x${mult}`)
 
-  paintHaunt()
-
   // A real rebirth: the whole plot goes. Skipping one for money keeps it.
   function wipePlot() {
     for (const id of ['secondFloor', 'thirdFloor']) if (owned.has(id)) out.onFloor?.(-YARD.floors.workers)
@@ -310,9 +266,6 @@ export function createGame({ yard, hud }) {
     respawn() // off the plot: a locked truck is about to park back in its bay
     carried.length = 0
     swingLeft = 0
-    felled = 0
-    if (hauntLeft > 0) forest.setHaunted(false)
-    hauntLeft = 0
     plot.wipe()
   }
 
@@ -345,7 +298,6 @@ export function createGame({ yard, hud }) {
       player.speedScale = stats.walkSpeed * GAME.speedPerPoint
       boards.repaint()
       boards.refreshPrices(hud.money)
-      paintHaunt()
     },
     // A board button or sign was clicked: 'buy', 'deny' or 'press' (nothing to pay for).
     upgrade,
@@ -363,7 +315,6 @@ export function createGame({ yard, hud }) {
       hud.addCrates(1, WINDOWS.gifts.crateName)
       boards.repaint()
       boards.refreshPrices(hud.money)
-      paintHaunt()
     },
     update(dt, elapsed, camera) {
       for (const [text, left] of told) {
@@ -376,7 +327,6 @@ export function createGame({ yard, hud }) {
       updateHands(dt)
       updateRings()
       shop.update(dt)
-      updateHaunt(dt)
       drawCarried()
       out.onDraw?.(items)
       items.end(dt)

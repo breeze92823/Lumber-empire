@@ -37,17 +37,22 @@ export function onStart(fn) {
 // --- Volume + mute (persisted) ---------------------------------------------------
 let volume = AUDIO.volume
 let muted = false
+let adBreak = false // silent for the length of an ad, whatever the player's own setting
 try {
   muted = localStorage.getItem(AUDIO.storageKey) === 'muted'
 } catch {
   // Storage blocked: unmuted.
 }
-const level = () => (muted ? 0 : volume * volume) // perceptual: the slider feels even
+const level = () => (muted || adBreak ? 0 : volume * volume) // perceptual: the slider feels even
 function applyLevel(t = 0.05) {
   if (A.master) A.master.gain.setTargetAtTime(level(), A.ctx.currentTime, t)
 }
 export function setVolume(v) {
   volume = Math.max(0, Math.min(1, Number(v) || 0))
+  applyLevel()
+}
+export function setAdBreak(on) {
+  adBreak = !!on
   applyLevel()
 }
 export const isMuted = () => muted

@@ -1,7 +1,7 @@
 import { Clock, Group, NeutralToneMapping, PCFSoftShadowMap, PerspectiveCamera, Raycaster, Scene, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
 import { CAMERA, graphicsPreset, NET, RENDER, WINDOWS } from './config.js'
 import * as bloxity from './bloxity.js'
-import { install as installInput, isLocked, onKey, setMouseChop } from './input.js'
+import { install as installInput, isLocked, onKey, releaseInput, setMouseChop } from './input.js'
 import { installTouch } from './touch.js'
 import { createPlayerBody, interpolate as interpolatePlayer, player, resetPlayer, respawn } from './player.js'
 import { setCameraSensitivity, syncYawToPlayer, update as updateCamera } from './camera.js'
@@ -17,10 +17,10 @@ import { rigPortraits } from './yard/rigPortrait.js'
 import { createGame } from './game.js'
 import { createHud } from './hud.js'
 import { career, upgradeCost } from './stats.js'
-import { initNet, net, onNetMessage, roster, saveNow, sendPose, sendYardFast, sendYardSlow, syncAvatar, syncPlot } from './net.js'
+import { initNet, net, onNetMessage, roster, saveNow, sendEmote, sendPose, sendYardFast, sendYardSlow, syncAvatar, syncPlot } from './net.js'
 import { createRemotePlayers } from './remotePlayers.js'
 import { createBubble } from './bubble.js'
-import { installAudio } from './audio/core.js'
+import { installAudio, setAdBreak, setVolume } from './audio/core.js'
 import * as sfx from './audio/sfx.js'
 import { closeTopWindow, createWindows, setWindowReserved } from './windows/index.js'
 import { setParticleDensity, updateParticles } from './particles.js'
@@ -31,6 +31,7 @@ import { buildDefaultCharacter } from './avatar/character.js'
 import { applyProportions } from './avatar/loader.js'
 import { buildLook } from './avatar/look.js'
 import { disposeAnimator, makeAnimator } from './avatar/animator.js'
+import { playEmote } from './avatar/emotes.js'
 
 // Boot order: Bloxity SDK -> renderer -> Rapier (async wasm) -> ground + sky + lighting,
 // player body -> avatar (async, swaps in when ready) -> loop. The SDK is optional at every step.
@@ -41,7 +42,7 @@ let postfx = null
 // Settings come from the portal's settings menu (or their defaults offline).
 function applySetting(key, value) {
   if (key === 'camera_sensitivity') setCameraSensitivity(value)
-  else if (key === 'fullscreen') bloxity.requestFullscreen(value)
+  else if (key === 'master_volume') setVolume(value / 100)
   else if (key === 'graphics_quality' && renderer) {
     const next = graphicsPreset(value)
     renderer.shadowMap.enabled = next.shadows
@@ -93,7 +94,9 @@ const world = createWorld(scene) // the clouds
 const concrete = buildGround(scene, yardContacts())
 landColliders()
 const yard = buildYard(scene, lighting)
-const hud = createHud({ onTrain: yard.sendTrain, onHome: respawn })
+const hud = createHud({ onTrain: yard.sendTrain, onHome: respawn, onMenu: bloxity.showMenu })
+hud.showFps(bloxity.settings.show_fps)
+bloxity.onSetting((key, value) => key === 'show_fps' && hud.showFps(value))
 const windows = createWindows(
   hud,
   yard.workers.setCount,
@@ -263,6 +266,19 @@ bloxity.onProportionsChanged(() => {
   syncAvatar()
 })
 bloxity.onRespawnRequest(respawn)
+bloxity.onEmote((id) => {
+  playEmote(() => animator, id)
+  sendEmote(id)
+})
+bloxity.onPointerLock((locked) => locked || releaseInput())
+
+// An ad break freezes the world and silences it. The room stays joined.
+let adBreak = false
+bloxity.onAdBreak((on) => {
+  adBreak = on
+  setAdBreak(on)
+  releaseInput()
+})
 
 // --- Modes + keys --------------------------------------------------------------
 onModeChanged((mode) => {
@@ -282,9 +298,22 @@ const felled = new Set() // trees already reported down
 let fastLeft = 0
 let slowLeft = 0
 let plotLeft = 0
+let friendLeft = 0
+
+// Bloxity friends in this room, for the Friend Boost.
+function countFriends() {
+  const friends = bloxity.refreshFriends(NET.friendsEvery)
+  const players = roster()
+  let n = 0
+  players?.forEach((p, id) => {
+    if (id !== players.mine && friends.has(p.uid)) n++
+  })
+  return n
+}
 
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.1) // clamp huge frames (tab switch, breakpoint)
+  if (adBreak) return
   const elapsed = clock.elapsedTime
 
   stepPhysics(dt) // runs the player controller + world at the fixed rate, interpolates bodies
@@ -329,6 +358,10 @@ function frame() {
   if ((plotLeft -= dt) <= 0) {
     plotLeft = NET.plotEvery
     syncPlot()
+  }
+  if ((friendLeft -= dt) <= 0) {
+    friendLeft = NET.friendCountEvery
+    hud.setFriends(countFriends())
   }
   updateParticles(elapsed, renderer.domElement.height)
   lighting.update(dt, playerGroup.position)

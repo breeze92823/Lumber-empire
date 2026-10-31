@@ -6,8 +6,8 @@ import { career } from './stats.js'
 // The on-screen HUD. Everything is sized in reference-screenshot pixels times --u
 // (set on resize), so the layout holds from phones to desktop. Live: the train timer,
 // the wallet with its gains, the hotbar's crates (fed by windows/), what the player carries,
-// the first-steps hint and short notices. Auto Chop, x2 Money and Rush Hour report to `onPerk`
-// (shop.js). The other buttons are placeholders.
+// the first-steps hint and short notices. Auto Chop, x2 Money and Rush Hour report to `onPerk` and
+// FREE REWARDS to `onRewards` (shop.js); Settings opens Boxity's menu.
 // Boxity draws its own toolbar top-left, so nothing here goes in that corner.
 const REF = { w: 1920, h: 985 }
 const MIN_SCALE = COARSE_POINTER ? 0.46 : 0.36 // on touch, keeps every tile at least 44 px tall
@@ -25,7 +25,7 @@ const tile =(cls, icon, text, alert = false) => `
     <span class="hud-tile-icon">${icon}</span><span class="hud-tile-text">${text}</span>
   </button>`
 
-export function createHud({ onTrain, onHome }) {
+export function createHud({ onTrain, onHome, onMenu }) {
   const root = document.createElement('div')
   root.className = 'hud'
   root.innerHTML = `
@@ -41,8 +41,7 @@ export function createHud({ onTrain, onHome }) {
       <div class="hud-wallet">
         <div class="hud-money">${moneyText(HUD.money)}<span class="hud-gain"></span></div>
         <div class="hud-boost">
-          <span>Friend Boost: +${HUD.friendBoost}%</span>
-          <button class="hud-btn hud-plus" type="button" aria-label="Invite friends">+</button>
+          <span>Friend Boost: +0%</span>
         </div>
       </div>
     </div>
@@ -82,6 +81,7 @@ export function createHud({ onTrain, onHome }) {
       </div>
     </div>
 
+    <div class="hud-fps" hidden></div>
     <div class="hud-hint" hidden></div>
     <div class="hud-toast" hidden></div>
     <div class="hud-carry" hidden></div>`
@@ -115,6 +115,15 @@ export function createHud({ onTrain, onHome }) {
   let crateSlot = null
 
   root.querySelector('.hud-home').addEventListener('click', () => onHome?.())
+  root.querySelector('.tile-settings').addEventListener('click', () => onMenu?.())
+  const rewards = root.querySelector('.hud-rewards')
+  rewards.style.display = 'none' // until an ad can play
+  rewards.addEventListener('click', () => out.onRewards?.())
+  const friendText = root.querySelector('.hud-boost span')
+  let friendPercent = 0
+  const fps = root.querySelector('.hud-fps')
+  let fpsFrames = 0
+  let fpsTime = 0
 
   const perks = {}
   for (const [id, cls] of [['rush', 'rush'], ['x2Money', 'x2'], ['autoChop', 'auto']]) {
@@ -127,6 +136,24 @@ export function createHud({ onTrain, onHome }) {
   const out = {
     root,
     onPerk: null,
+    onRewards: null,
+    showRewards(on) {
+      rewards.style.display = on ? '' : 'none'
+    },
+    showFps(on) {
+      fps.hidden = !on
+    },
+    // n Bloxity friends in the room.
+    setFriends(n) {
+      const next = n * HUD.friendBoost
+      if (next === friendPercent) return
+      friendPercent = next
+      friendText.textContent = `Friend Boost: +${next}%`
+    },
+    // What the Friend Boost multiplies a sale by.
+    get friendCash() {
+      return 1 + friendPercent / 100
+    },
     // The price tag of a perk button, or what it shows instead once bought.
     showPerk(id, text) {
       if (perks[id].textContent !== text) perks[id].textContent = text
@@ -182,6 +209,13 @@ export function createHud({ onTrain, onHome }) {
       giftAlert.style.display = on ? '' : 'none'
     },
     update(dt) {
+      if (!fps.hidden) {
+        fpsFrames++
+        if ((fpsTime += dt) >= 0.5) {
+          fps.textContent = `${Math.round(fpsFrames / fpsTime)} FPS`
+          fpsFrames = fpsTime = 0
+        }
+      }
       if (toastLeft > 0 && (toastLeft -= dt) <= 0) toast.hidden = true
       if (gainLeft > 0 && (gainLeft -= dt) <= 0) {
         gained = 0

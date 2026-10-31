@@ -12,6 +12,7 @@ import { composedSkinUrl } from './avatar/cdn.js'
 import { buildDefaultCharacter } from './avatar/character.js'
 import { buildLook } from './avatar/look.js'
 import { disposeAnimator, makeAnimator } from './avatar/animator.js'
+import { playEmote } from './avatar/emotes.js'
 import { createBubble } from './bubble.js'
 import { net, roster } from './net.js'
 import { label } from './propkit.js'
@@ -43,6 +44,7 @@ class Remote {
     this.wasSwinging = false
     this.kind = ''
     this.item = null
+    this.emote = null // the roster's `emote` last seen; null until then, so an old one doesn't play
     this.setAvatar(buildDefaultCharacter())
   }
 
@@ -95,6 +97,10 @@ class Remote {
     this.syncName(p)
     this.syncAvatar(p.avatar)
     this.bubble.update(dt)
+    if (p.emote !== this.emote) {
+      if (this.emote !== null) playEmote(() => this.animator, p.emote.split('#')[0])
+      this.emote = p.emote
+    }
 
     // A new pose resets the dead-reckoning base.
     const b = this.base

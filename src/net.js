@@ -8,7 +8,7 @@
 // Never throws and never blocks play: with no server (or an unreachable one) the game runs on a
 // fresh, unsaved state and keeps trying to connect.
 import { Client } from '@colyseus/sdk'
-import { DEV_MODE, NET, SERVER_URL } from './config.js'
+import { ADS, DEV_MODE, NET, SERVER_URL } from './config.js'
 import {
   authState,
   canResolveServer,
@@ -159,6 +159,25 @@ export function syncPlot() {
   send('setPlot', { plot })
 }
 
+let emoteSeq = 0
+// The emote this player started: the number makes a repeat of it a change the others see.
+export const sendEmote = (id) => send('emote', { emote: `${id}#${++emoteSeq % 1000}` })
+
+// Has the server check a watched ad's token with Boxity: true when it is good.
+let adClaim = null
+export function claimAdReward(rewardToken) {
+  return new Promise((resolve) => {
+    const finish = (ok) => {
+      clearTimeout(timer)
+      adClaim = null
+      resolve(ok)
+    }
+    const timer = setTimeout(() => finish(false), ADS.claimTimeout * 1000)
+    adClaim = finish
+    send('adReward', { rewardToken })
+  })
+}
+
 // Live yard frames (yard/sync.js).
 export const sendYardFast = (frame) => net.connected && send('yardFast', frame)
 export const sendYardSlow = (frame) => net.connected && send('yardSlow', frame)
@@ -195,6 +214,7 @@ function attach(room) {
     lastSaved = ''
     saveNow()
   })
+  room.onMessage('adReward', (msg) => adClaim?.(!!msg?.ok))
   room.onMessage('serverError', () => {
     // The save exists but could not be read: never overwrite it.
     net.hydrated = false

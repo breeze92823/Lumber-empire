@@ -1,4 +1,6 @@
 import './windows.css'
+import { ADS } from '../config.js'
+import { showPanelAds } from '../bloxity.js'
 
 // The shared popup frame: black border, gradient banner with a white inset line, orange X,
 // over a blur of the world (the veil, under the HUD). Only one window is open at a time;
@@ -85,6 +87,7 @@ export function createWindow({ title, icon = '', extra = '', className = '', onO
       document.body.classList.add('uiw-open') // windows.css: the left HUD column folds away
       veil.hidden = false
       overlay.hidden = false
+      if (window.innerWidth >= ADS.panelMinWidth) showPanelAds(true)
       onOpen?.()
       fitClear(win)
       replay(frame, 'uiw-pop')
@@ -98,6 +101,7 @@ export function createWindow({ title, icon = '', extra = '', className = '', onO
       document.body.classList.remove('uiw-open')
       veil.hidden = true
       overlay.hidden = true
+      showPanelAds(false)
       onClose?.()
     },
   }

@@ -26,6 +26,9 @@ const authListeners = new Set()
 const settingListeners = new Set()
 const respawnListeners = new Set()
 const chatListeners = new Set()
+const emoteListeners = new Set()
+const adBreakListeners = new Set()
+const pointerLockListeners = new Set()
 const unsubscribers = []
 
 function emit(listeners, ...args) {
@@ -68,6 +71,24 @@ export function onRespawnRequest(fn) {
 export function onChat(fn) {
   chatListeners.add(fn)
   return () => chatListeners.delete(fn)
+}
+
+// The emote this player picked on Boxity's wheel: fn(id). Boxity only tells the one who picked it.
+export function onEmote(fn) {
+  emoteListeners.add(fn)
+  return () => emoteListeners.delete(fn)
+}
+
+// fn(true) as an ad break starts, fn(false) as it ends. Boxity starts them whenever it likes.
+export function onAdBreak(fn) {
+  adBreakListeners.add(fn)
+  return () => adBreakListeners.delete(fn)
+}
+
+// fn(locked) when the portal takes or gives back the cursor.
+export function onPointerLock(fn) {
+  pointerLockListeners.add(fn)
+  return () => pointerLockListeners.delete(fn)
 }
 
 // --- Auth ---------------------------------------------------------------
@@ -160,9 +181,16 @@ export function init() {
 
   try {
     const onLocalhost = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
-    SDK.init(onLocalhost ? { gameSlug: GAME_SLUG, portalUrl: 'https://bloxity.io' } : { gameSlug: GAME_SLUG })
+    const started = SDK.init(onLocalhost ? { gameSlug: GAME_SLUG, portalUrl: 'https://bloxity.io' } : { gameSlug: GAME_SLUG })
+    // Registered any sooner it is a silent no-op.
+    Promise.resolve(started)
+      .then(() => SDK.game?.registerFeature?.('emotes'))
+      .catch((err) => console.warn('[bloxity] emotes not registered', err))
     SDK.leaderboard?.define?.(LEADERBOARDS)
     setAvatarHosts(SDK.environment?.())
+    // The handshake can answer after init, on stage for one.
+    const offEnvironment = SDK.onEnvironmentChanged?.(setAvatarHosts)
+    if (typeof offEnvironment === 'function') unsubscribers.push(offEnvironment)
     SDK.game.loadingStep(`Loading ${GAME_TITLE}`)
 
     for (const key of Object.keys(SETTINGS)) {
@@ -197,10 +225,20 @@ export function init() {
     }
 
     unsubscribers.push(
-      SDK.player.onEvent((event) => {
+      SDK.player.onEvent((event, data) => {
         if (event === 'respawn_request') emit(respawnListeners)
+        else if (event === 'play_emote' && typeof data === 'string' && data) emit(emoteListeners, data)
+        else if (event === 'pointer_lock_changed') emit(pointerLockListeners, !!data)
       }),
     )
+
+    for (const [listen, on] of [
+      [SDK.ads?.onBreakStart, true],
+      [SDK.ads?.onBreakEnd, false],
+    ]) {
+      const off = listen?.call(SDK.ads, () => emit(adBreakListeners, on))
+      if (typeof off === 'function') unsubscribers.push(off)
+    }
 
     // Subscribing is what opts in to chat; Boxity draws the chat box itself.
     const offChat = SDK.chat?.onMessage?.((m) => {
@@ -319,6 +357,71 @@ export function toggleCustomizer() {
   }
 }
 
+// Every emote in the catalogue, [{ id, clip: { len, loop, tracks } }]. Rejects when it can't be read.
+export async function fetchEmotes() {
+  const base = sdk()?.environment?.()?.apiUrl
+  if (!base) return []
+  const res = await fetch(`${base.replace(/\/$/, '')}/v1/avatar/emotes`)
+  if (!res.ok) throw new Error(`emotes: ${res.status}`)
+  const body = await res.json()
+  return Array.isArray(body) ? body : body?.emotes ?? []
+}
+
+// --- Friends ----------------------------------------------------------
+// The signed-in player's friends' Bloxity ids, re-read at most every `every` s. Empty for a guest.
+const friendIds = new Set()
+let friendsAt = -Infinity
+
+export function refreshFriends(every) {
+  const now = performance.now()
+  if (now - friendsAt < every * 1000) return friendIds
+  friendsAt = now
+  if (!authState.user) {
+    friendIds.clear()
+    return friendIds
+  }
+  Promise.resolve(sdk()?.social?.getFriends?.())
+    .then((list) => {
+      friendIds.clear()
+      for (const f of Array.isArray(list) ? list : []) {
+        const id = f?._id ?? f?.id ?? f?.userId
+        if (id) friendIds.add(String(id))
+      }
+    })
+    .catch(() => {
+      // Keep the list we have.
+    })
+  return friendIds
+}
+
+// --- Ads --------------------------------------------------------------
+export function canShowRewarded() {
+  try {
+    return !!sdk()?.ads?.isAvailable?.()
+  } catch {
+    return false
+  }
+}
+
+// { status, rewardToken?, test? }: only 'completed' earns the reward. Never rejects.
+export async function showRewarded(placement) {
+  try {
+    return (await sdk()?.ads?.showRewarded?.(placement)) ?? { status: 'disabled' }
+  } catch {
+    return { status: 'error' }
+  }
+}
+
+// Banners for a screen of ours while it is open, on the edges round it.
+export function showPanelAds(on) {
+  try {
+    if (on) sdk()?.ads?.screen?.('panel')
+    else sdk()?.ads?.hideScreen?.()
+  } catch {
+    // Ignore.
+  }
+}
+
 // --- Game server ------------------------------------------------------
 // Bloxity hosting has no fixed socket URL: the matchmaker picks a pod with room (or wakes one) and
 // the SDK returns its endpoint (the dev channel reaches the dev backend, prod the prod one). Each
@@ -432,15 +535,4 @@ function estimatedReservedAreas(w, h) {
     { id: 'toolbar', left: 0, top: 0, width: Math.min(w, w < 480 ? w : 330), height: toolbarHeight },
     { id: 'chat', left: 0, top: toolbarHeight, width: Math.round(chatWidth + 8), height: compact ? 140 : 180 },
   ]
-}
-
-export function requestFullscreen(on) {
-  try {
-    const SDK = sdk()
-    if (!SDK) return
-    if (on) SDK.portal.requestFullscreen()
-    else SDK.portal.exitFullscreen()
-  } catch {
-    // Ignore.
-  }
 }
