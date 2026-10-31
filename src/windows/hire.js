@@ -1,3 +1,4 @@
+import * as sfx from '../audio/sfx.js'
 import { SHOP, WINDOWS } from '../config.js'
 import { shortMoney } from '../hud.js'
 import { ART } from './art.js'
@@ -34,6 +35,7 @@ export function createHire(hud, onHire) {
   buy.addEventListener('click', () => {
     if (workers >= maxWorkers || hud.money < price) return replay(buy, 'uiw-shake')
     hud.addMoney(-price)
+    sfx.buy()
     workers++
     price *= priceGrowth
     onHire(workers)
@@ -45,6 +47,7 @@ export function createHire(hud, onHire) {
       const { n, money } = packs[i]
       if (workers + n > hireCap || hud.money < money) return replay(button, 'uiw-shake')
       hud.addMoney(-money)
+      sfx.buy()
       workers += n
       onHire(workers)
       render()

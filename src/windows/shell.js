@@ -1,4 +1,5 @@
 import './windows.css'
+import * as sfx from '../audio/sfx.js'
 import { ADS } from '../config.js'
 import { showPanelAds } from '../bloxity.js'
 
@@ -23,11 +24,12 @@ export function closeTopWindow() {
   return true
 }
 
-// Restarts a one-shot CSS animation ('uiw-pop', 'uiw-shake').
+// Restarts a one-shot CSS animation ('uiw-pop', 'uiw-shake'). A button shaking is a refusal.
 export function replay(el, cls) {
   el.classList.remove(cls)
   void el.offsetWidth
   el.classList.add(cls)
+  if (cls === 'uiw-shake') sfx.deny()
 }
 
 // Boxity's toolbar (bloxity.onReservedAreas) sits over the top-left corner, over the whole
@@ -86,6 +88,7 @@ export function createWindow({ title, icon = '', extra = '', className = '', onO
       current?.close()
       current = win
       shown = true
+      sfx.panel(true)
       document.body.classList.add('uiw-open') // windows.css: the left HUD column folds away
       veil.hidden = false
       overlay.hidden = false
@@ -100,6 +103,7 @@ export function createWindow({ title, icon = '', extra = '', className = '', onO
       if (!shown) return
       shown = false
       current = null
+      sfx.panel(false)
       document.body.classList.remove('uiw-open')
       veil.hidden = true
       overlay.hidden = true

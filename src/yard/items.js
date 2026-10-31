@@ -150,6 +150,7 @@ export function createItems(scene) {
   }
 
   const out = {
+    meshes: [...Object.values(meshes), chipMesh],
     add,
     onLand: null, // (item, where): anything thrown has arrived
     // How high an item stands when its bottom is at floor y.

@@ -335,6 +335,29 @@ export function createGame({ yard, hud }) {
       boards.repaint()
       boards.refreshPrices(hud.money)
     },
+    // What the crew makes a second with nobody watching: the logs it can gather, shared between
+    // the walks no conveyor saves it, as far as the machines and the trucks keep up, at the price of
+    // what each line ends in. Boosts that run out don't count.
+    crewIncome() {
+      const crew = yard.workers.crew.length
+      if (!crew) return 0
+      const { trip, share } = GAME.offline
+      const truck = GAME.trucks.levels[stats.truckLevel]
+      const bays = trucks.list.filter((t) => t.owned).length
+      const walks = 1 + stages.filter((s) => s.owned && !s.linked).length
+      const gathered = (crew * stats.workerCarry * stats.workerSpeed * GAME.workerSpeedPerPoint) / trip / walks
+      const carried = (bays * truck.items) / ((2 * GAME.trucks.drive + stats.delivery) * (truck.trip ?? 1))
+      let left = Math.min(gathered, carried)
+      let income = 0
+      for (const l of lines) {
+        const run = l.stages.filter((s) => s.owned)
+        if (l.floor && !run.length) continue
+        const made = Math.min(left, ...run.map((s) => (s.speed * yard.sky.boost) / s.time))
+        income += made * GAME.products[run.at(-1)?.out ?? 'log'].value
+        left -= made
+      }
+      return income * (1 + truck.bonus / 100) * trucks.cash * shop.lastingCash * share
+    },
     // A board button or sign was clicked: 'buy', 'deny' or 'press' (nothing to pay for).
     upgrade,
     press(button) {
