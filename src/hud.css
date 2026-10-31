@@ -5,6 +5,12 @@
   --sr: env(safe-area-inset-right, 0px);
   --st: env(safe-area-inset-top, 0px);
   --sb: env(safe-area-inset-bottom, 0px);
+  /* Boxity's rectangles, set in hud.js: toolbar bottom and right, chat feed bottom and right. */
+  --res-top: 0px;
+  --res-tool-r: 0px;
+  --res-chat-b: 0px;
+  --res-chat-r: 0px;
+  --ur: var(--u); /* the right column's --u */
   position: fixed;
   inset: 0;
   z-index: 20; /* above the touch zones, below portal overlays */
@@ -89,7 +95,7 @@
 .hud-left {
   position: absolute;
   left: calc(var(--sl) + 18 * var(--u));
-  top: calc(var(--st) + 340 * var(--u));
+  top: max(calc(var(--st) + 340 * var(--u)), calc(var(--res-chat-b) + 8px));
   bottom: calc(var(--sb) + 88 * var(--u));
   display: flex;
   flex-direction: column;
@@ -288,13 +294,13 @@
 }
 .hud-rush-sub {
   top: calc(142 * var(--u));
-  font-size: calc(18 * var(--u));
+  font-size: max(9px, calc(18 * var(--u)));
   -webkit-text-stroke: calc(5 * var(--u)) #6a3208;
   paint-order: stroke fill;
 }
 .hud-rush-time {
   top: calc(164 * var(--u));
-  font-size: calc(21 * var(--u));
+  font-size: max(9px, calc(21 * var(--u)));
   -webkit-text-stroke: calc(5 * var(--u)) #7a1020;
   paint-order: stroke fill;
 }
@@ -363,7 +369,7 @@
   transform: translateX(-50%);
   white-space: nowrap;
   color: #c9ffd0;
-  font-size: calc(17 * var(--u));
+  font-size: max(9px, calc(17 * var(--u)));
   -webkit-text-stroke: calc(5 * var(--u)) #0d5a24;
   paint-order: stroke fill;
 }
@@ -409,7 +415,7 @@
   transform: rotate(8deg);
   white-space: nowrap;
   color: #fff;
-  font-size: calc(16 * var(--u));
+  font-size: max(9px, calc(16 * var(--u)));
   -webkit-text-stroke: calc(5 * var(--u)) #8a0a1a;
   paint-order: stroke fill;
 }
@@ -453,15 +459,19 @@
   width: calc(76 * var(--u));
   height: calc(74 * var(--u));
   background: rgba(90, 90, 90, 0.82);
-  font-size: calc(15 * var(--u));
+  font-size: max(10px, calc(15 * var(--u)));
   font-weight: 500;
+}
+.hud-slot.on {
+  background: rgba(70, 150, 80, 0.9);
+  box-shadow: inset 0 0 0 calc(3 * var(--u)) #ffd83a;
 }
 .hud-slot i {
   position: absolute;
   left: calc(4 * var(--u));
   top: calc(3 * var(--u));
   font-style: normal;
-  font-size: calc(13 * var(--u));
+  font-size: max(9px, calc(13 * var(--u)));
 }
 .hud-feedback {
   position: absolute;
@@ -481,27 +491,31 @@
 }
 
 /* --- Game notices ---------------------------------------------------------------- */
+.hud-notes {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--st) + 66 * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(8 * var(--u));
+}
 .hud-hint,
 .hud-toast {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: min(90vw, calc(860 * var(--u)));
+  max-width: min(100%, calc(860 * var(--u)));
   padding: calc(9 * var(--u)) calc(22 * var(--u));
   border-radius: calc(12 * var(--u));
   text-align: center;
-  white-space: nowrap;
   font-size: max(14px, calc(26 * var(--u)));
   -webkit-text-stroke: calc(4 * var(--u)) #101018;
   paint-order: stroke fill;
 }
 .hud-hint {
-  top: calc(var(--st) + 66 * var(--u));
   background: rgba(24, 30, 42, 0.62);
   color: #ffe58a;
 }
 .hud-toast {
-  top: calc(var(--st) + 118 * var(--u));
   background: rgba(150, 30, 30, 0.8);
   color: #fff;
 }
@@ -527,10 +541,17 @@
   color: #ff8a6a;
 }
 
-/* --- Small screens and touch: keep clear of the joystick, jump cluster and top buttons -- */
+/* --- Touch: tap targets, and clear of the joystick, the thumb arc and the top buttons ---- */
+.touch-ui .hud-rewards,
+.touch-ui .hud-slot,
+.touch-ui .hud-x2,
+.touch-ui .hud-auto,
+.touch-ui .hud-home {
+  min-height: 44px;
+}
+.touch-ui .hud-rewards,
 .touch-ui .hud-slot {
   min-width: 44px;
-  min-height: 44px;
 }
 .touch-ui .hud-right {
   top: calc(var(--st) + 66px);
@@ -539,7 +560,7 @@
   display: none;
 }
 .touch-ui .hud-left {
-  top: calc(var(--st) + 66px + 60 * var(--u));
+  top: max(calc(var(--st) + 66px + 60 * var(--u)), calc(var(--res-chat-b) + 8px));
   bottom: auto;
   gap: calc(10 * var(--u));
 }
@@ -549,33 +570,208 @@
 .touch-ui .hud-bottom {
   bottom: calc(var(--sb) + 8px);
 }
+.touch-ui .hud-fps {
+  right: calc(var(--sr) + 116px);
+}
+
+/* --- Small screens: the columns come apart, round Boxity's toolbar and chat feed --------- */
+@media (orientation: portrait), (max-height: 500px) {
+  .hud-left {
+    display: contents;
+  }
+  .hud-grid {
+    position: absolute;
+    margin: 0;
+    grid-template-columns: repeat(4, calc(124 * var(--u)));
+    gap: calc(12 * var(--u));
+  }
+  .hud-wallet {
+    position: absolute;
+    margin: 0;
+  }
+  .hud-money {
+    margin-left: 0;
+  }
+  .hud-bottom {
+    flex-direction: row;
+    gap: 6px;
+  }
+  .hud-bottom-row {
+    gap: 6px;
+  }
+  .hud-hotbar {
+    margin-top: 0;
+  }
+}
+
+/* Tall: chat feed, then the tiles and the wallet under it, the right column beside it. */
 @media (orientation: portrait) {
+  .hud {
+    --hud-tiles: calc(max(var(--res-chat-b), var(--st)) + 6px);
+    --train-h: calc(46 * var(--u));
+  }
+  .touch-ui {
+    --hud-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--touch-pad) + var(--touch-arc) + 8px);
+  }
+  .hud-grid {
+    left: calc(var(--sl) + 8px);
+    top: calc(var(--hud-tiles) + 20 * var(--u));
+  }
+  .hud-wallet {
+    left: calc(var(--sl) + 10px);
+    top: calc(var(--hud-tiles) + 134 * var(--u));
+  }
+  .hud-notes {
+    left: 8px;
+    right: 8px;
+    top: calc(var(--hud-tiles) + 258 * var(--u));
+  }
+  .hud .tut-card {
+    top: calc(var(--hud-tiles) + 258 * var(--u));
+  }
+  .hud-train {
+    left: auto;
+    right: calc(var(--sr) + 8px);
+    top: calc(max(var(--res-top), var(--st)) + 2px);
+    width: calc(232 * var(--ur));
+    transform: none;
+  }
+  .hud-right,
+  .touch-ui .hud-right {
+    --u: var(--ur);
+    right: calc(var(--sr) + 8px);
+    top: calc(max(var(--res-top), var(--st)) + 4px + var(--train-h));
+  }
+  .hud-rewards {
+    margin-right: 0;
+  }
+  .hud-fps,
+  .touch-ui .hud-fps {
+    right: calc(var(--sr) + 16px + 232 * var(--ur));
+    top: calc(max(var(--res-top), var(--st)) + 4px);
+  }
   .touch-ui .hud-bottom {
-    bottom: calc(var(--sb) + 190px);
+    left: calc(var(--sl) + 8px);
+    bottom: var(--hud-bottom);
+    transform: none;
   }
   .touch-ui .hud-carry {
-    bottom: calc(var(--sb) + 190px + 200 * var(--u));
+    bottom: calc(var(--hud-bottom) + 52px);
   }
 }
-@media (max-width: 640px), (max-height: 500px) {
+/* Phones: the tiles two by two, the wallet small at the bottom left, over the Auto Chop button. */
+@media (orientation: portrait) and (max-width: 700px) {
+  .hud-grid {
+    grid-template-columns: repeat(2, calc(124 * var(--u)));
+    gap: calc(24 * var(--u)) calc(12 * var(--u));
+  }
+  .hud-wallet {
+    top: auto;
+    bottom: calc(var(--hud-bottom, var(--sb)) + 58px);
+  }
+  .hud-money {
+    font-size: 20px;
+    -webkit-text-stroke-width: 4px;
+  }
+  .hud-gain {
+    font-size: 15px;
+    -webkit-text-stroke-width: 3px;
+  }
+  .hud-boost {
+    margin-top: 3px;
+    font-size: 11px;
+    -webkit-text-stroke-width: 2.5px;
+  }
+}
+/* Too short for notes under the tiles: the tutorial card would cover the Axe slot it points at. */
+@media (orientation: portrait) and (max-width: 700px) and (max-height: 620px) {
+  .hud-notes,
+  .hud .tut-card {
+    left: calc(var(--sl) + 8px + 272 * var(--u));
+    top: calc(var(--hud-tiles) + 142 * var(--u));
+    max-width: calc(100vw - 16px - 272 * var(--u));
+    transform: none;
+  }
+  .hud-notes {
+    right: 8px;
+  }
+}
+/* The smallest phones: the buy prompt takes the hint's place, which is saying the same thing. */
+@media (orientation: portrait) and (max-height: 620px), (orientation: landscape) and (max-height: 340px) {
+  body:has(.interact.show) .hud-hint {
+    display: none;
+  }
+}
+
+/* Short: the tiles run along the top beside the chat feed, the wallet goes under it. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .hud-grid {
+    left: calc(max(var(--res-chat-r), var(--sl)) + 8px);
+    top: calc(var(--res-top) + 4px + 20 * var(--u));
+  }
+  .hud-wallet {
+    left: calc(var(--sl) + 10px);
+    top: calc(var(--res-chat-b) + 4px);
+  }
+  .hud-notes {
+    left: calc(max(var(--res-chat-r), var(--sl)) + 8px);
+    right: calc(var(--sr) + 16px + 232 * var(--u));
+    top: calc(var(--res-top) + 12px + 118 * var(--u));
+  }
+  .hud .tut-card {
+    left: max(50%, calc(var(--res-chat-r) + 96px));
+    top: calc(var(--res-top) + 12px + 118 * var(--u));
+  }
   .hud-train {
-    top: calc(var(--st) + 56px);
+    left: max(50%, calc(var(--res-tool-r) + 74px));
+    top: calc(var(--st) + 6px);
   }
-  .hud-hint {
-    top: calc(var(--st) + 92px);
-    white-space: normal;
+  .hud-right,
+  .touch-ui .hud-right {
+    right: calc(var(--sr) + 8px);
+    top: calc(var(--st) + 62px);
   }
-  .hud-toast {
-    top: calc(var(--st) + 134px);
-    white-space: normal;
+  .hud-rewards {
+    position: absolute;
+    right: 100%;
+    bottom: 0;
+    margin: 0 calc(8 * var(--u)) 0 0;
+  }
+  .hud-bottom,
+  .touch-ui .hud-bottom {
+    bottom: calc(var(--sb) + 18px);
+  }
+  .hud-carry {
+    bottom: calc(var(--sb) + 74px);
   }
 }
-/* Too narrow to fit between the side columns: go below them. */
-@media (max-width: 640px) {
-  .hud-hint {
-    top: calc(var(--st) + 332px);
+/* No room for four tiles between the chat feed and the right column: two by two beside the column. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 660px) {
+  .hud-grid {
+    left: auto;
+    right: calc(var(--sr) + 16px + 232 * var(--u));
+    grid-template-columns: repeat(2, calc(124 * var(--u)));
   }
-  .hud-toast {
-    top: calc(var(--st) + 376px);
+  .hud-notes {
+    top: calc(var(--res-top) + 12px + 228 * var(--u));
+  }
+  .hud .tut-card {
+    top: calc(var(--res-top) + 12px + 228 * var(--u));
+  }
+  .hud-train {
+    left: calc(var(--res-tool-r) + 66px);
+  }
+}
+/* Too short for the right column over the thumb arc, or the wallet over the joystick. */
+@media (orientation: landscape) and (max-height: 340px) {
+  .hud-right,
+  .touch-ui .hud-right {
+    --u: 0.36px;
+  }
+  .hud-wallet {
+    left: calc(var(--sl) + 138px);
+  }
+  .hud-notes {
+    right: calc(var(--sr) + 16px + var(--touch-arc));
   }
 }

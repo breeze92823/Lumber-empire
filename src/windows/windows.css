@@ -896,3 +896,193 @@
     margin-top: calc(38 * var(--u));
   }
 }
+
+/* --- Phones held upright: each window reflows to a narrower design, so everything in it is
+   a third bigger than the wide layout shrunk to fit. --w / --h are that design's size. ---- */
+@media (orientation: portrait) and (max-width: 700px) {
+  .uiw {
+    --u: min(
+      (100vw - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / var(--w),
+      (100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--uiw-top)) / var(--h),
+      1px
+    );
+  }
+  .uiw.uiw {
+    --w: 540;
+    --h: 570;
+    --head: 96;
+    --x: 96;
+  }
+  .uiw-icon {
+    width: calc(76 * var(--u));
+    height: calc(76 * var(--u));
+    margin-right: calc(8 * var(--u));
+  }
+  .uiw-title {
+    font-size: calc(58 * var(--u));
+  }
+  .w-hire .uiw-title,
+  .w-depot .uiw-title {
+    font-size: calc(46 * var(--u));
+  }
+  .w-hire .uiw-banner,
+  .w-depot .uiw-banner {
+    padding-right: calc(16 * var(--u));
+  }
+  .uiw-close {
+    font-size: calc(72 * var(--u));
+  }
+
+  .gf-robux {
+    right: calc(18 * var(--u));
+    top: calc(14 * var(--u));
+    width: calc(150 * var(--u));
+    height: calc(62 * var(--u));
+    font-size: calc(36 * var(--u));
+  }
+  .gf-row {
+    gap: calc(6 * var(--u));
+  }
+  .gf-card {
+    width: calc(125 * var(--u));
+  }
+  .tone-green {
+    width: calc(170 * var(--u));
+  }
+  .tone-blue {
+    width: calc(518 * var(--u));
+  }
+  .gf-foot {
+    gap: calc(10 * var(--u));
+    padding: 0 calc(14 * var(--u));
+  }
+  .gf-next {
+    width: calc(262 * var(--u));
+  }
+  .gf-next-text {
+    font-size: calc(33 * var(--u));
+  }
+  .gf-bar {
+    width: calc(240 * var(--u));
+  }
+  .gf-all {
+    width: calc(222 * var(--u));
+    font-size: calc(44 * var(--u));
+  }
+
+  .uiw.w-rebirth {
+    --h: 470;
+  }
+  .rb-trade {
+    grid-template-columns: calc(224 * var(--u)) calc(40 * var(--u)) calc(224 * var(--u));
+  }
+  .rb-tray {
+    gap: calc(5 * var(--u));
+  }
+  .rb-tile {
+    width: calc(69 * var(--u));
+  }
+  .rb-tray.wide .rb-tile {
+    width: calc(104 * var(--u));
+  }
+  .rb-tile b {
+    font-size: calc(23 * var(--u));
+  }
+  .rb-equals i {
+    width: calc(34 * var(--u));
+  }
+  .rb-next {
+    width: calc(480 * var(--u));
+    height: auto;
+    margin: calc(4 * var(--u)) 0 calc(6 * var(--u));
+    line-height: 1.2;
+    text-align: center;
+  }
+  .rb-bar {
+    width: calc(480 * var(--u));
+  }
+  .rb-bar i {
+    background-size: calc(472 * var(--u)) 100%;
+  }
+  .rb-actions {
+    gap: calc(10 * var(--u));
+  }
+  .rb-go {
+    width: calc(232 * var(--u));
+    font-size: calc(46 * var(--u));
+  }
+  .rb-count {
+    width: calc(238 * var(--u));
+    font-size: calc(26 * var(--u));
+  }
+  .rb-foot {
+    gap: calc(10 * var(--u));
+    padding: calc(8 * var(--u)) calc(14 * var(--u));
+  }
+  .rb-skip-text h3 {
+    font-size: calc(34 * var(--u));
+  }
+  .rb-skip-text p {
+    font-size: calc(22 * var(--u));
+  }
+  .rb-skip {
+    flex: none;
+    width: calc(216 * var(--u));
+    font-size: calc(38 * var(--u));
+  }
+
+  .uiw.w-index {
+    --h: 680;
+  }
+  .ix-well {
+    height: calc(430 * var(--u));
+  }
+  .ix-grid {
+    grid-template-columns: repeat(3, calc(152 * var(--u)));
+  }
+  .ix-foot p {
+    font-size: calc(27 * var(--u));
+  }
+
+  .hr-pack {
+    width: calc(122 * var(--u));
+    font-size: calc(46 * var(--u));
+  }
+  .hr-coin {
+    font-size: calc(31 * var(--u));
+  }
+  .hr-coin svg {
+    width: calc(34 * var(--u));
+    height: calc(38 * var(--u));
+  }
+
+  .uiw.w-depot {
+    --h: 730;
+  }
+  .dp-top {
+    flex-direction: column;
+    gap: calc(14 * var(--u));
+    padding: calc(14 * var(--u)) calc(14 * var(--u)) 0;
+  }
+  .dp-face {
+    width: calc(200 * var(--u));
+    height: calc(200 * var(--u));
+  }
+  .dp-rows {
+    flex: none;
+    width: 100%;
+  }
+  .dp-lucky,
+  .dp-next {
+    padding: 0 calc(14 * var(--u));
+    line-height: 1.25;
+    white-space: normal;
+  }
+  .dp-lucky {
+    margin-top: calc(16 * var(--u));
+  }
+  .dp-next {
+    margin-top: calc(10 * var(--u));
+    padding-bottom: calc(14 * var(--u));
+  }
+}

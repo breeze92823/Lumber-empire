@@ -29,6 +29,7 @@ export function createGame({ yard, hud }) {
   const { buyRings, logsRings, owned, sellRings } = plot
 
   const carried = []
+  let axeOn = true
   let swingLeft = 0
   let swingTree = null
   let struck = false
@@ -37,6 +38,8 @@ export function createGame({ yard, hud }) {
   let nearTree = false
   let sold = false
   const told = new Map() // complaint -> s left before it may repeat
+
+  const carryMax = () => Math.max(stats.carry, out.tutorialCarry)
 
   function complain(text) {
     if (told.has(text)) return
@@ -84,7 +87,10 @@ export function createGame({ yard, hud }) {
     return 'buy'
   }
 
-  forest.onDown = () => sfx.fall()
+  forest.onHit = (t) => sfx.chop(t.x, t.z)
+  forest.onFell = (t) => sfx.creak(t.x, t.z)
+  forest.onDown = (t) => sfx.fall(t.x, t.z)
+  items.onLand = (item, at) => sfx.land(item.kind, at.x, at.y, at.z)
 
   // --- The axe ----------------------------------------------------------------------
   function updateAxe(dt) {
@@ -100,15 +106,16 @@ export function createGame({ yard, hud }) {
       const done = 1 - swingLeft / GAME.swingTime
       if (!struck && done >= GAME.hitAt) {
         struck = true
-        if (swingTree?.state === 'up') {
-          forest.hit(swingTree, stats.axe, p.x, p.z)
-          sfx.chop()
-        }
+        if (swingTree?.state === 'up') forest.hit(swingTree, stats.axe, p.x, p.z)
       }
       if (swingLeft <= 0) swingLeft = 0
       return
     }
     if (!tree || !(inputState.chop || (shop.autoChop && !tree.locked))) return
+    if (!axeOn) {
+      if (inputState.chop) complain('Equip your axe first (slot 1)')
+      return
+    }
     if (tree.locked) {
       complain(`Buy ${sales.get('moreForest').title} to chop here`)
       return
@@ -134,14 +141,14 @@ export function createGame({ yard, hud }) {
     hands.z = p.z
     const level = floorAt(p.y)
     const here = lines[level]
-    const room = stats.carry - carried.length
+    const room = carryMax() - carried.length
     const log = level ? null : forest.nearestLog(p.x, p.z, GAME.pickupRange)
     if (log) {
       if (room > 0) {
         carried.push(forest.takeLog(log))
         sfx.pick()
       } else {
-        complain(`Your hands are full (${stats.carry}): upgrade Carry Capacity`)
+        complain(`Your hands are full (${carryMax()}): upgrade Carry Capacity`)
       }
     }
 
@@ -161,7 +168,7 @@ export function createGame({ yard, hud }) {
       return
     }
     for (const s of here.stages) {
-      if (!s.owned || !s.stock.length || carried.length >= stats.carry) continue
+      if (!s.owned || !s.stock.length || carried.length >= carryMax()) continue
       if (Math.hypot(s.pallet.x - p.x, s.pallet.z - p.z) > GAME.dockRange) continue
       carried.push(s.stock.pop())
       handsLeft = GAME.loadEvery
@@ -176,6 +183,7 @@ export function createGame({ yard, hud }) {
         carried.splice(logAt, 1)
         handsLeft = GAME.loadEvery
         sfx.pick()
+        out.onPiled?.()
       } else {
         complain('The log pile is full')
       }
@@ -198,6 +206,7 @@ export function createGame({ yard, hud }) {
         return
       }
       trucks.sell(carried.pop(), truck, hands)
+      sfx.sell()
       handsLeft = GAME.loadEvery
       return
     }
@@ -237,7 +246,7 @@ export function createGame({ yard, hud }) {
 
   function updateHint() {
     let hint = null
-    if (!sold) {
+    if (!sold && !out.tutorialCarry) {
       const debarker = stages[0].owned
       if (!debarker && hud.money >= sales.get('debarker').cost) hint = 'buy'
       else if (!debarker && carried.length) hint = 'sellLogs'
@@ -252,8 +261,8 @@ export function createGame({ yard, hud }) {
 
   trucks.onSold = (value) => {
     if (stages[0].owned) sold = true // raw logs sold before the Debarker are part of the lesson, not its end
+    out.onSold?.()
     hud.earn(Math.round(value * shop.cash))
-    sfx.sell()
   }
   train.onDocked = () => hud.notify(`The train is in! Its load pays x${YARD.train.pay}`)
   train.onLeft = (value, count) => {
@@ -274,11 +283,33 @@ export function createGame({ yard, hud }) {
     plot.wipe()
   }
 
+  // Slot 1. Off, there's no axe in the hand and no chopping.
+  function setAxe(on) {
+    axeOn = on
+    if (!on) swingLeft = 0
+    hud.setAxe(on)
+  }
+  hud.onAxe = () => {
+    setAxe(!axeOn)
+    sfx.toggle(axeOn)
+  }
+
   const out = {
     onNearTree: null,
     onFloor: null,
+    onSold: null,
+    onPiled: null,
+    tutorialCarry: 0, // logs the hands hold while the tutorial runs (tutorial.js), 0 after it
+    setAxe,
+    toggleAxe: hud.onAxe,
+    get axeOn() {
+      return axeOn
+    },
     get carrying() {
       return carried.length > 0
+    },
+    get logsHeld() {
+      return carried.reduce((n, c) => n + (c.kind === 'log' ? 1 : 0), 0)
     },
     get swing() {
       return swingLeft > 0 ? 1 - swingLeft / GAME.swingTime : 0
@@ -315,6 +346,7 @@ export function createGame({ yard, hud }) {
     // opens as a Workshop silhouette to buy. `skipped` = bought with money, no reset.
     rebirth(count, skipped) {
       career.rebirths = count
+      sfx.rebirth()
       if (!skipped) wipePlot()
       plot.setRebirths(count)
       hud.addCrates(1, WINDOWS.gifts.crateName)
@@ -334,7 +366,7 @@ export function createGame({ yard, hud }) {
       drawCarried()
       out.onDraw?.(items)
       items.end(dt)
-      hud.setCarry(carried.length, stats.carry)
+      hud.setCarry(carried.length, carryMax())
       updateHint()
       priceCheck -= dt
       if (priceCheck <= 0) {

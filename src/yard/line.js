@@ -393,6 +393,9 @@ export function createLine(items, sky, floor = 0) {
     get anything() {
       return pile.length > 0 || inbound > 0 || belt.length > 0 || stages.some((m) => m.inside || m.stock.length || m.incoming)
     },
+    get moving() {
+      return belt.length > 0
+    },
     // The floor as numbers: [belt: [item code, s in tenths, stage, leaving?, ...], Truck Lifter: [item
     // code, d in tenths, ...], pile: [item code, ...], each machine: [inside item code or -1, progress
     // in hundredths, [pallet item code, ...]]].

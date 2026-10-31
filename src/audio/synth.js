@@ -8,7 +8,7 @@
 //    collapses; dozens of them are what makes water sound like water
 //  - tone(): a pitched partial with glide (thumps, horns, whine)
 // Every call takes random variation (vary) so repeats never machine-gun.
-import { A, now } from './core.js'
+import { A, muffle, nearness, now, panTo } from './core.js'
 
 export const rnd = (lo, hi) => lo + Math.random() * (hi - lo)
 export const vary = (x, pct) => x * (1 + (Math.random() * 2 - 1) * pct)
@@ -31,6 +31,21 @@ export function route(node, { bus = A.sfx, pan = 0, verb = 0 } = {}) {
     last.connect(s).connect(A.verb)
   }
   return last
+}
+
+// A one-shot at a place in the world: pass what this returns as a recipe's `bus`. Level, muffling and
+// pan come from how far off it is. Null when it is out of earshot: skip the sound.
+export function placed(x, y, z, range, { bus = A.sfx, verb = 0 } = {}) {
+  const k = nearness(x, y, z, range)
+  if (k <= 0) return null
+  const air = A.ctx.createBiquadFilter()
+  air.type = 'lowpass'
+  air.frequency.value = muffle(k)
+  const level = A.ctx.createGain()
+  level.gain.value = k * k
+  air.connect(level)
+  route(level, { bus, pan: panTo(x, z), verb })
+  return air
 }
 
 // Attack/decay envelope on a gain param: linear attack, exponential decay to silence.
@@ -111,7 +126,8 @@ export function tone(o) {
 }
 
 // Struck object. modes: [[ratio, amp, decay s], ...] relative to f.
-// beat: detune cents of the twin of each mode (metal); strike: noise click level.
+// beat: detune cents of the twin of each mode (metal); strike: noise click level; top: Hz over which
+// modes are left out.
 export function modal(o) {
   const ctx = A.ctx
   const t = o.t ?? now()
@@ -121,7 +137,7 @@ export function modal(o) {
   let end = t
   for (const [ratio, amp, decay] of o.modes) {
     const f = o.f * ratio * (1 + (Math.random() - 0.5) * (o.spread ?? 0.004))
-    if (f > ctx.sampleRate * 0.45) continue
+    if (f > (o.top ?? ctx.sampleRate * 0.45)) continue
     const twins = o.beat ? [-o.beat / 2, o.beat / 2] : [0]
     for (const cents of twins) {
       const osc = ctx.createOscillator()
@@ -136,7 +152,7 @@ export function modal(o) {
       end = Math.max(end, t + d)
     }
   }
-  if (o.strike) burst({ t, f: Math.min(9000, o.f * 2.2), q: 0.8, a: 0.0005, d: 0.006, gain: o.strike, bus: out })
+  if (o.strike) burst({ t, noise: 'pink', f: Math.min(3200, o.f * 2.2), q: 0.8, a: 0.0005, d: 0.006, gain: o.strike, bus: out })
   return end
 }
 

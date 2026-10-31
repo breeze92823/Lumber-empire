@@ -186,7 +186,6 @@ export function createRig(parent, name, world) {
   let yawNow = 0
   let gear = 0
   let shifting = 0
-  let beep = 0
   let popped = 1
   let waited = false
   const phase = Math.random() * 10
@@ -291,7 +290,6 @@ export function createRig(parent, name, world) {
       rig.moving = true
       waited = false
       smoke.visible = true
-      if (back) beep = 0
       pose()
     },
     // Goes back in the pool.
@@ -363,13 +361,6 @@ export function createRig(parent, name, world) {
         const swing = Math.min(rig.v * 0.03, 0.55) + Math.sin(elapsed * 11 + phase) * Math.min(rig.v * 0.012, 0.09)
         for (const o of flaps) o.rotation.x = swing
 
-        if (reversing) {
-          beep -= h
-          if (beep <= 0) {
-            beep = 0.9
-            world.sound('beep', tractor.position.x, tractor.position.z)
-          }
-        }
         at(route, rig.s + T.wheelbase + 22, c)
         const ahead = wrap(Math.atan2(c.x - b.x, c.z - b.z) - yaw)
         const flash = elapsed * 1.5 % 1 < 0.5

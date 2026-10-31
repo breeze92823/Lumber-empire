@@ -1,4 +1,10 @@
 /* Touch controls (touch.js). Hidden unless body.touch-ui. */
+:root {
+  --touch-pad: clamp(12px, 3vmin, 24px);
+  --touch-jump: clamp(72px, 20vmin, 100px);
+  --touch-side: clamp(52px, 14vmin, 70px);
+  --touch-arc: calc(var(--touch-jump) + var(--touch-side) + 12px); /* the thumb arc's square */
+}
 .touch-root {
   display: none;
   position: fixed;
@@ -6,7 +12,7 @@
   z-index: 10;
   pointer-events: none;
   font-family: 'Fredoka', system-ui, sans-serif;
-  --pad: clamp(12px, 3vmin, 24px);
+  --pad: var(--touch-pad);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
@@ -37,6 +43,17 @@
 .touch-right {
   right: 0;
   width: 55%;
+}
+/* Tall screens: the thumb only reaches the lower half, so the upper half looks too. */
+@media (orientation: portrait) {
+  .touch-left {
+    top: 50%;
+    width: 55%;
+    z-index: 1;
+  }
+  .touch-right {
+    width: 100%;
+  }
 }
 
 /* --- Floating joystick -------------------------------------------------------- */
@@ -116,16 +133,24 @@
   width: 44px;
   height: 44px;
 }
+/* A narrow phone's Boxity toolbar takes the whole top edge: they stand on the thumb arc. */
+@media (orientation: portrait) {
+  .touch-top {
+    top: auto;
+    bottom: calc(var(--safe-b) + var(--pad) + var(--touch-arc) + 8px);
+    flex-direction: column;
+  }
+}
 
 /* Thumb arc in the bottom-right corner: jump biggest and closest to the thumb. */
 .touch-cluster {
-  --jump: clamp(72px, 20vmin, 100px);
-  --side: clamp(52px, 14vmin, 70px);
+  --jump: var(--touch-jump);
+  --side: var(--touch-side);
   position: absolute;
   right: calc(var(--safe-r) + var(--pad));
   bottom: calc(var(--safe-b) + var(--pad));
-  width: calc(var(--jump) + var(--side) + 12px);
-  height: calc(var(--jump) + var(--side) + 12px);
+  width: var(--touch-arc);
+  height: var(--touch-arc);
 }
 .touch-cluster .touch-btn {
   position: absolute;
@@ -145,8 +170,8 @@
 }
 .touch-btn.chop {
   display: none;
-  right: calc(var(--jump) + var(--side) + 18px);
-  bottom: calc(var(--jump) * 0.1);
+  left: -4px; /* the corner the arc leaves free: in reach, and never on the HUD or the joystick */
+  top: -4px;
   width: var(--jump);
   height: var(--jump);
   background: rgba(226, 120, 30, 0.8);

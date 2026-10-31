@@ -5,9 +5,10 @@
 // Graph:  ui ─────────────────────────────┐
 //         sfx ──┬──────────────────────────┤
 //               └─ reverb send ─ convolver ┤
-//         world (duck) ─┬─ amb ────────────┼─ master ─ glue comp ─ limiter ─ out
+//         world (duck) ─┬─ amb ────────────┼─ master ─ softener ─ glue comp ─ limiter ─ out
 //                       └─ engine ─────────┘
 // `world` dips while a menu window is open so the UI sits on top of the scene.
+// The softener (AUDIO.soft) takes the top end down, whatever a recipe does nothing comes out piercing.
 // The reverb is a generated impulse response: a few early reflections (the
 // cliffs and stalls) and a short, darkening tail, so one-shots sit in the beach
 // instead of sounding pasted on top of it.
@@ -168,9 +169,17 @@ function buildGraph() {
   limit.ratio.value = 20
   limit.attack.value = 0.002
   limit.release.value = 0.1
+  const shelf = ctx.createBiquadFilter()
+  shelf.type = 'highshelf'
+  shelf.frequency.value = AUDIO.soft.shelf
+  shelf.gain.value = AUDIO.soft.cut
+  const top = ctx.createBiquadFilter()
+  top.type = 'lowpass'
+  top.frequency.value = AUDIO.soft.top
+  top.Q.value = 0.5
   const master = ctx.createGain()
   master.gain.value = 0
-  master.connect(glue).connect(limit).connect(ctx.destination)
+  master.connect(shelf).connect(top).connect(glue).connect(limit).connect(ctx.destination)
 
   const bus = (gain, to = master) => {
     const g = ctx.createGain()
@@ -223,6 +232,29 @@ export function installAudio() {
     else A.ctx.resume?.().catch(() => {})
   })
 }
+
+// The player's ears: distance runs from their feet, left and right from the camera.
+export const ear = { x: 0, y: 0, z: 0, rx: 1, rz: 0 }
+export function setEar(p, camera) {
+  const m = camera.matrixWorld.elements
+  ear.x = p.x
+  ear.y = p.y
+  ear.z = p.z
+  ear.rx = m[0]
+  ear.rz = m[2]
+}
+// 0 at or past the far end of a range, 1 inside its near end.
+export function nearness(x, y, z, [full, silent]) {
+  return Math.max(0, Math.min(1, (silent - Math.hypot(x - ear.x, y - ear.y, z - ear.z)) / (silent - full)))
+}
+export function panTo(x, z) {
+  const dx = x - ear.x
+  const dz = z - ear.z
+  const d = Math.hypot(dx, dz)
+  return d < 1 ? 0 : ((dx * ear.rx + dz * ear.rz) / d) * AUDIO.width
+}
+// How much of the top end is left at that nearness: the air eats it first.
+export const muffle = (k) => AUDIO.air[0] * (AUDIO.air[1] / AUDIO.air[0]) ** k
 
 export const ready = () => !!A.master && A.ctx.state === 'running'
 // Start time for a one-shot: a hair ahead of the clock, so the nodes reach the audio

@@ -39,6 +39,10 @@ export function syncYawToPlayer() {
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
 
+// At CAMERA.fov a portrait screen sees a sliver of the yard: the vertical FOV opens up until the view is wide enough.
+const HALF_DEG = Math.PI / 360
+const baseFov = (aspect) => clamp(Math.atan(Math.tan(CAMERA.portraitWidth * HALF_DEG) / aspect) / HALF_DEG, CAMERA.fov, CAMERA.maxFov)
+
 // Entering first person keeps the view direction; leaving it backs the boom out
 // a little so a single wheel notch doesn't flip straight back in. (The
 // listener also runs once at registration; that call keeps the resting boom.)
@@ -108,7 +112,7 @@ export function update(camera, dt) {
   const speed = Math.hypot(player.velocity.x, player.velocity.z)
   const targetRush = clamp((speed - PHYSICS.walkSpeed) / (PHYSICS.sprintSpeed - PHYSICS.walkSpeed), 0, 1)
   rush += (targetRush - rush) * (1 - Math.exp(-CAMERA.speedEase * dt))
-  const fov = CAMERA.fov + CAMERA.speedFov * rush
+  const fov = baseFov(camera.aspect) + CAMERA.speedFov * rush
   if (Math.abs(camera.fov - fov) > 0.01) {
     camera.fov = fov
     camera.updateProjectionMatrix()
