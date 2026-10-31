@@ -1,10 +1,10 @@
-import { Group } from 'three'
+﻿import { Group } from 'three'
 import { YARD } from '../config.js'
 import { solidBox } from '../propkit.js'
 import { career, upgradeCost } from '../stats.js'
 import { leaders } from './leaders.js'
 import { box, matte, picture, place, spring } from './kit.js'
-import { paintEventLow, paintEventTop, paintLeaderPanel, paintPerkPanel, paintPumpkin, paintSaleSign, paintUpgradeBoard, upgradeButtons, eventLowButtons, eventTopButtons, paintPriceTag } from './paint.js'
+import { paintLeaderPanel, paintPerkPanel, paintSaleSign, paintUpgradeBoard, upgradeButtons, paintPriceTag } from './paint.js'
 
 // Every sign in the yard. The faces are unlit canvases (the reference's boards stay
 // bright even though the sun is behind them); the frames are chunky lit timber.
@@ -31,43 +31,6 @@ function upgradeBoard(scene, spec) {
   place(scene, g, spec.x, spec.z)
   solidBox(spec.w / 2 + 0.5, 2, 0.3, spec.x, 2, spec.z)
   return face
-}
-
-// The double Halloween + Tree Luck board, pumpkins on its corners.
-function eventBoard(scene) {
-  const B = YARD.eventBoard
-  const g = new Group()
-  const totalLow = B.lift + B.lowH
-  const top = totalLow + 0.52 + B.topH
-  const post = matte(C.woodDark)
-  const trim = matte('#3a2a78')
-  // Two long posts: timber below, painted indigo along the Halloween panel.
-  for (const x of [-B.w / 2 - 0.16, B.w / 2 + 0.16]) {
-    box(g, post, 0.44, totalLow + 0.3, 0.46, x, (totalLow + 0.3) / 2, 0)
-    box(g, trim, 0.4, B.topH + 0.5, 0.42, x, totalLow + 0.3 + (B.topH + 0.5) / 2, 0)
-  }
-  box(g, post, B.w + 0.3, 0.3, 0.34, 0, B.lift - 0.1, 0)
-  box(g, post, B.w + 0.3, 0.3, 0.34, 0, totalLow + 0.13, 0)
-  box(g, post, B.w + 0.3, 0.3, 0.34, 0, totalLow + 0.42, 0)
-  box(g, matte('#c98a36'), B.w + 0.5, 0.28, 0.4, 0, top + 0.1, 0)
-  box(g, matte('#111725'), B.w, B.lowH, 0.2, 0, B.lift + B.lowH / 2, -0.03)
-  box(g, matte('#111725'), B.w, B.topH, 0.2, 0, totalLow + 0.52 + B.topH / 2, -0.03)
-  const lowFace = paintEventLow(B.low, B.w, B.lowH)
-  const topFace = paintEventTop(B.top, B.w, B.topH)
-  picture(g, lowFace, B.w, B.lowH, 0, B.lift + B.lowH / 2, 0.17)
-  picture(g, topFace, B.w, B.topH, 0, totalLow + 0.52 + B.topH / 2, 0.17)
-
-  // Jack-o'-lantern blocks: the carved face looks out, the rest is plain pumpkin.
-  const plain = matte(B.pumpkin)
-  const face = paintPumpkin()
-  for (const x of [-B.w / 2 - 0.1, B.w / 2 + 0.1]) {
-    box(g, plain, 0.96, 0.82, 0.86, x, top + 0.62, 0)
-    picture(g, face, 0.9, 0.78, x, top + 0.62, 0.44)
-    box(g, matte('#5f7a2c'), 0.16, 0.26, 0.16, x, top + 1.14, 0)
-  }
-  place(scene, g, B.x, B.z, B.yaw)
-  solidBox(B.w / 2 + 0.4, 2, 0.34, B.x, 2, B.z, B.yaw)
-  return { lowFace, topFace }
 }
 
 // A wooden sign holding colour panels stacked one above the other.
@@ -308,15 +271,8 @@ function upgradeDefs(spec, face) {
 // can be pressed, and the Leaderboard stands in the player's own yard only.
 export function buildBoards(scene, remote = false) {
   const reg = createButtons(scene)
-  const E = YARD.eventBoard
   for (const s of [YARD.workerBoard, YARD.playerBoard]) reg.add(s, 0.17, upgradeDefs(s, { cy: s.lift + s.h / 2, h: s.h, buttons: upgradeButtons(s) }))
-  reg.add(E, 0.17, [
-    ...upgradeDefs(E, { cy: E.lift + E.lowH / 2, h: E.lowH, buttons: eventLowButtons(E.low, E.w, E.lowH) }),
-    ...upgradeDefs(E, { cy: E.lift + E.lowH + 0.52 + E.topH / 2, h: E.topH, buttons: eventTopButtons(E.top, E.w, E.topH) }),
-  ])
   const faces = [upgradeBoard(scene, YARD.workerBoard), upgradeBoard(scene, YARD.playerBoard)]
-  const { lowFace, topFace } = eventBoard(scene)
-  faces.push(lowFace, topFace)
   panelSign(scene, YARD.perkSign, YARD.perkSign.w, (YARD.perkSign.h - YARD.perkSign.lift) / YARD.perkSign.panels.length, YARD.perkSign.lift, false, reg)
   const T = YARD.perkTower
   panelSign(scene, T, T.w, (T.h - 0.4) / T.panels.length, 0.4, true, reg)
@@ -342,6 +298,5 @@ export function buildBoards(scene, remote = false) {
       for (const f of faces) f.userData.paint()
       reg.repaintRows()
     },
-    repaintEvent: () => topFace.userData.paint(),
   }
 }

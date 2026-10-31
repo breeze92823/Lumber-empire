@@ -39,6 +39,8 @@ export const NET = {
   fastEvery: 0.2,
   slowEvery: 1,
   plotEvery: 0.5,
+  friendsEvery: 30, // s between reads of the Bloxity friends list
+  friendCountEvery: 2, // s between counts of the friends in the room
 }
 
 // --- World (metres: +X east, +Z south, +Y up) -------------------------------
@@ -663,7 +665,7 @@ export const GAME = {
 // HUD values for the buttons that have no rules yet (the money is real).
 export const HUD = {
   money: 0,
-  friendBoost: 0,
+  friendBoost: 10, // % more on every sale per Bloxity friend in the room (a guess)
   hotbar: ['Axe'],
 }
 
@@ -675,7 +677,7 @@ export const SHOP = {
   hacker: { title: 'The Hacker', gems: 399, money: 2500000, cash: 2 },
   opTruck: { title: 'The OP Truck', gems: 69, money: 5000000 }, // above the Titan's $2.5M level
   autoChop: { title: 'Auto Chop', gems: 39, money: 12000 },
-  x2Money: { title: 'x2 Money', gems: 11, money: 6000, scales: true, seconds: 300, cash: 2 },
+  x2Money: { title: 'x2 Money', gems: 11, money: 24000, scales: true, seconds: 300, cash: 2 },
   rush: { title: 'Rush Hour', gems: 19, money: 10000, scales: true, seconds: 90, cash: 2, speed: 2 },
   allGifts: { gems: 59, money: 8000 }, // more than the gifts' $7,600, or buying it would print money
   skipRebirth: { gems: 45, goals: 3 }, // money = this many of the rebirth's goals
@@ -734,9 +736,9 @@ export const WINDOWS = {
     unlocks: ['THE WORKSHOP', 'TRUCK BAY 3, BAY 2 CONVEYER AND TRAIN LOADER', 'BAY 3 CONVEYER', null, 'TRUCK BAY 4 AND BAY 4 CONVEYER'], // what rebirth n + 1 opens, in order
   },
   hire: {
-    workers: 3,
+    workers: 0, // the crew starts empty: the first worker is bought at the HIRE ring
     maxWorkers: 5,
-    price: 6000,
+    price: 100, // the first hire; cheap enough to afford from the first logs sold
     priceGrowth: 2, // each hire multiplies the price
   },
   // Each truck rolls once every time it pulls in; everything on a lucky one pays `mult`.
@@ -914,7 +916,18 @@ export const SETTINGS = {
   graphics_quality: { def: DEFAULT_GRAPHICS, type: 'enum', values: ['Low', 'Medium', 'High', 'Ultra'] },
   camera_sensitivity: { def: '1', type: 'number', min: 0.1, max: 5 },
   show_fps: { def: 'false', type: 'bool' },
-  fullscreen: { def: 'false', type: 'bool' },
+  master_volume: { def: '80', type: 'number', min: 0, max: 100 },
+}
+
+// Boxity's ads (bloxity.js). The FREE REWARDS button: `placement` is lowercase, digits and hyphens,
+// and the ad gives x2 Money for `seconds` (a guess). Screen ads sit on the edges round a window, so
+// a screen narrower than `panelMinWidth` px, with no edges to spare, shows none.
+export const ADS = {
+  placement: 'x2-money',
+  seconds: 120,
+  claimTimeout: 8, // s to wait for the server's check of a watched ad
+  checkEvery: 1, // s between asking whether a rewarded ad can play
+  panelMinWidth: 900,
 }
 
 // The base rig, measured from player.glb: origin at the feet, 6.4 units tall at bind pose.
@@ -937,6 +950,7 @@ export const PROPORTIONS = {
 const deg = (d) => (d * Math.PI) / 180
 export const ANIM = {
   airborneDelay: 0.07, // s off the ground before the air pose (ignores a step down a ledge)
+  emoteFade: 0.2, // s an emote takes to blend in and out
   // Walk -> run is one cycle at two depths; phase advances with distance travelled.
   locomotion: {
     minFrequency: 0.7,

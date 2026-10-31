@@ -1,17 +1,15 @@
-import { SHOP, WINDOWS } from '../config.js'
+import { WINDOWS } from '../config.js'
 import { shortMoney } from '../hud.js'
 import { ART } from './art.js'
 import { createWindow, replay } from './shell.js'
 
 // Trade the money for a higher tier: a rebirth clears the wallet, counts up, raises the goal
-// and calls onRebirth(rebirths), which resets the plot and applies the rewards. Skipping one costs
-// a few goals and calls onRebirth(rebirths, true): the rewards without the reset.
+// and calls onRebirth(rebirths), which resets the plot and applies the rewards.
 const tile = (icon, text, cls = '') => `<div class="rb-tile ${cls}"><span class="rb-art">${icon}</span><b>${text}</b></div>`
 
 export function createRebirth(hud, onRebirth) {
   const { goalGrowth, unlocks } = WINDOWS.rebirth
   let goal = WINDOWS.rebirth.goal
-  const skipCost = () => goal * SHOP.skipRebirth.goals
   let rebirths = 0
 
   const win = createWindow({ title: 'Rebirth', icon: ART.rebirth, className: 'w-rebirth', onOpen: render })
@@ -33,16 +31,9 @@ export function createRebirth(hud, onRebirth) {
         <button class="rb-go uiw-tap" type="button">Rebirth</button>
         <div class="rb-count"><b></b></div>
       </div>
-    </div>
-    <div class="uiw-foot rb-foot">
-      <div class="rb-skip-text">
-        <h3>Skip A Rebirth!</h3>
-        <p>No reset! Keep your<br>cash, plot &amp; workers</p>
-      </div>
-      <button class="rb-skip uiw-tap" type="button" aria-label="Skip a rebirth"><b></b></button>
     </div>`
-  const [loseMoney, next, fill, label, go, count, skip, skipPrice] = [
-    '.rb-lose-money b', '.rb-next', '.rb-bar i', '.rb-bar b', '.rb-go', '.rb-count b', '.rb-skip', '.rb-skip b',
+  const [loseMoney, next, fill, label, go, count] = [
+    '.rb-lose-money b', '.rb-next', '.rb-bar i', '.rb-bar b', '.rb-go', '.rb-count b',
   ].map((s) => win.body.querySelector(s))
 
   function render() {
@@ -52,26 +43,15 @@ export function createRebirth(hud, onRebirth) {
     fill.style.width = `${Math.min(money / goal, 1) * 100}%`
     label.textContent = `Money: ${shortMoney(money)}/${shortMoney(goal)}`
     count.textContent = `Rebirths: ${rebirths}`
-    skipPrice.textContent = shortMoney(skipCost())
-  }
-
-  function advance(skipped) {
-    rebirths++
-    goal *= goalGrowth
-    onRebirth(rebirths, skipped)
-    render()
   }
 
   go.addEventListener('click', () => {
     if (hud.money < goal) return replay(go, 'uiw-shake')
     hud.addMoney(-hud.money)
-    advance(false)
-  })
-
-  skip.addEventListener('click', () => {
-    if (hud.money < skipCost()) return replay(skip, 'uiw-shake')
-    hud.addMoney(-skipCost())
-    advance(true)
+    rebirths++
+    goal *= goalGrowth
+    onRebirth(rebirths)
+    render()
   })
 
   return {

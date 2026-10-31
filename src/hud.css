@@ -202,15 +202,13 @@
   -webkit-text-stroke: calc(6 * var(--u)) #103a7a;
   paint-order: stroke fill;
 }
-.hud-plus {
-  width: calc(50 * var(--u));
-  height: calc(50 * var(--u));
-  border: calc(3 * var(--u)) solid #0d2a6a;
-  border-radius: calc(12 * var(--u));
-  background: linear-gradient(#57aeff, #1f66e0);
+.hud-fps {
+  position: absolute;
+  top: calc(var(--st) + 6px);
+  right: calc(var(--sr) + 8px);
   color: #fff;
-  -webkit-text-stroke: 0;
-  font-size: calc(34 * var(--u));
+  font-size: 12px;
+  text-shadow: 0 1px 2px #000;
 }
 
 /* --- Right column --------------------------------------------------------------- */
@@ -530,7 +528,6 @@
 }
 
 /* --- Small screens and touch: keep clear of the joystick, jump cluster and top buttons -- */
-.touch-ui .hud-plus,
 .touch-ui .hud-slot {
   min-width: 44px;
   min-height: 44px;

@@ -72,6 +72,15 @@ export function setMouseChop(on) {
   recomputeMove()
 }
 
+// Lets go of everything held: a keyup that lands while something else has the focus is never seen.
+export function releaseInput() {
+  held.clear()
+  orbiting = false
+  mouseChop = false
+  inputState.jump = false
+  recomputeMove()
+}
+
 export function install(showMenu, canvasEl) {
   canvas = canvasEl
   document.addEventListener('pointerlockchange', () => {
@@ -125,11 +134,5 @@ export function install(showMenu, canvasEl) {
     { passive: false },
   )
   window.addEventListener('contextmenu', (e) => e.preventDefault())
-  window.addEventListener('blur', () => {
-    held.clear()
-    orbiting = false
-    mouseChop = false
-    inputState.jump = false
-    recomputeMove()
-  })
+  window.addEventListener('blur', releaseInput)
 }
