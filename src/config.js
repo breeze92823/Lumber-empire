@@ -60,7 +60,7 @@ export const PLOTS = {
     { side: -1, row: 1 },
   ],
   // A neighbour's yard is the real thing only next to it; from anywhere else a stand-in (yard/standIn.js).
-  area: { west: -22, east: 37, north: -31, south: 51 }, // the fence's box, in a yard's own coordinates
+  area: { west: -22, east: 71, north: -31, south: 51 }, // the fence's box at its widest, in a yard's own coordinates
   liveRange: 14, // m from that box: closer and the real yard comes in...
   liveLeave: 22, // ...until the viewer is this far out again
   bakeBudget: 25000, // vertices a frame a stand-in copies, so taking a new one is never a hitch
@@ -363,6 +363,15 @@ export const YARD = {
     golden: [[31.5, -29.5]],
     stumps: [[23.4, -9.5], [23.6, -7], [25, 15]],
     clear: 3.2, // m of space kept round each planted tree and the More Forest ring
+    // The land past the east fence, bought a strip at a time up to the airport's fence (AIR.compound).
+    // Each strip moves the fence out to `east`, opens its trees and leaves room for `logs` more on
+    // the ground. `land` = the rows they stand in: `columns` of them to a strip, staggered. Prices are guesses.
+    land: { columns: 2, north: -22.5, south: 48, gapZ: 6, jitter: 1.2 },
+    parcels: [
+      { sale: 'moreForest2', title: 'More Forest II', price: '$2,500', east: 48, logs: 20, note: 'The fence moved out: a new strip of forest is yours to chop' },
+      { sale: 'moreForest3', title: 'More Forest III', price: '$20,000', east: 59, logs: 20, note: 'The fence moved out again: more forest to chop' },
+      { sale: 'moreForest4', title: 'More Forest IV', price: '$150,000', east: 70.5, logs: 20, note: 'Your forest now runs all the way to the airport' },
+    ],
     foliage: ['#14593a', '#5fd085'],
     goldFoliage: ['#b6892a', '#e0bf56'],
     trunk: '#40292a',
@@ -409,10 +418,19 @@ export const YARD = {
     ring: { count: 16, life: 2, size: 0.22 },
     op: { count: 50, life: 2.2, size: 0.3 },
     hacker: { count: 40, life: 2.4, size: 0.2, color: '#3dff8a' },
-    leaves: { count: 110, life: 9, size: 0.26, colors: ['#2f9a58', '#57b86a', '#d8b64a'] },
+    leaves: { count: 240, life: 9, size: 0.26, colors: ['#2f9a58', '#57b86a', '#d8b64a'] },
     motes: { count: 90, life: 8, size: 0.12, color: '#fff5d8' },
   },
 }
+
+// Each strip of forest is sold where the last one ended: just inside the fence, as More Forest is.
+YARD.forest.parcels.forEach((p, i, parcels) => {
+  const sale = YARD.saleSigns.find((s) => s.id === 'moreForest')
+  const ring = YARD.rings.find((r) => r.buy === 'moreForest')
+  const shift = (i ? parcels[i - 1].east : YARD.fence.points[5][0]) - YARD.fence.points[5][0]
+  YARD.saleSigns.push({ ...sale, id: p.sale, x: sale.x + shift, title: p.title, price: p.price, needs: i ? parcels[i - 1].sale : sale.id, later: true })
+  YARD.rings.push({ ...ring, x: ring.x + shift, buy: p.sale })
+})
 
 // Every upper floor repeats the ground floor's machines, id@floor, at its own prices, then adds
 // what only a floor has: a LOGS IN ring, its Wood Lifter and the Truck Lifter down to the belt.
@@ -484,6 +502,7 @@ export const AIR = {
     east: 75, top: 86.5, // the tunnel's far end, and where the far trench comes up
     floor: -6, roof: -2, // the roof is the underside of the floor collider
     keepClear: 2.4, // m of forest kept off the trench
+    skirt: 1.4, // m the crew stays off it, walking round
     lampEvery: 6.5, // m between timber sets, each with a lamp
     lane: 5.9, // z workers walk it on; they spread by a little each
   },
@@ -498,7 +517,6 @@ export const AIR = {
   taxi: { turn: 18, east: 178, hold: 214, back: 118 },
   // Fixed spots on the apron.
   hangar: { x: 152, z: -32.5, w: 64, d: 24, h: 20 },
-  tower: { x: 95, z: -32 },
   tanks: { x: 206, z: -32 },
   sock: { x: 240, z: 27 },
   masts: [[90, -42], [232, -42], [90, 27], [232, 27], [330, 56], [450, 56], [330, 27], [450, 27]],

@@ -1,5 +1,5 @@
 import { Group } from 'three'
-import { AIR, GAME, YARD } from '../config.js'
+import { AIR, GAME, overShaft, YARD } from '../config.js'
 import { label } from '../propkit.js'
 import { box, matte } from './kit.js'
 
@@ -138,7 +138,7 @@ export function buildPuppets(scene, { items, forest }, item) {
           w.load = it ? [it] : []
         }
         w.count = w.load.length ? flat[at + 6] : 0
-        w.g.visible = i < n && w.to.y > -0.3 && w.to.x < YARD.fence.points[5][0] // off down the owner's tunnel: nothing to see here
+        w.g.visible = i < n && w.to.y > -0.3 && w.to.x < AIR.compound.west // off down the owner's tunnel: nothing to see here
         if (!w.placed) {
           w.placed = true
           w.g.position.set(w.to.x, w.to.y, w.to.z)
@@ -207,6 +207,32 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items, air }
     if (fromEast !== toEast && (from.z > east[1] || z > east[1])) w.path.push(fromEast ? east : west, fromEast ? west : east)
     else if (fromEast && z < east[1] + 1 && from.z > east[1]) w.path.push(east)
     w.path.push([x, z])
+    w.path = roundTrench(w.path, w.g.position)
+  }
+
+  // The crew walks straight through the forest, so anything out past the trench goes round its mouth.
+  function roundTrench(path, from) {
+    const T = AIR.tunnel
+    const [north, south] = [T.z - T.half - T.skirt, T.z + T.half + T.skirt]
+    const [west, east] = [T.west - T.skirt, T.portal + T.skirt]
+    const out = []
+    let [ax, az] = [from.x, from.z]
+    for (const p of path) {
+      const [bx, bz] = p
+      const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / 2)
+      let over = false
+      for (let i = 1; i <= steps && !over; i++) over = overShaft(ax + ((bx - ax) * i) / steps, az + ((bz - az) * i) / steps, T.skirt - 0.2)
+      if (over && ((az < north && bz > south) || (az > south && bz < north))) {
+        const end = ax + bx > west + east ? east : west
+        out.push([end, az < bz ? north : south], [end, az < bz ? south : north])
+      } else if (over) {
+        const side = az + bz > T.z * 2 ? south : north
+        for (const x of ax > bx ? [east, west] : [west, east]) if (x > Math.min(ax, bx) && x < Math.max(ax, bx)) out.push([x, side])
+      }
+      out.push(p)
+      ;[ax, az] = p
+    }
+    return out
   }
 
   // Pallets with something left on them once the others' shares are taken: the furthest along
@@ -242,8 +268,8 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items, air }
     return crew.reduce((n, o) => (o === w || !isFlier(o) ? n : n + Math.max(o.load.length, o.job === 'pick' ? stats.workerCarry : 0)), 0)
   }
   const flies = (w) => isFlier(w) && air.room - airComing(w) > 0
-  // Past the fence or under it: the only way back to the yard is the tunnel.
-  const offYard = (w) => w.g.position.x > AIR.tunnel.west + 1 && (w.g.position.x > YARD.fence.points[5][0] || w.g.position.y < -0.2)
+  // Past the airport's fence or under it: the only way back to the yard is the tunnel.
+  const offYard = (w) => w.g.position.x > AIR.tunnel.west + 1 && (w.g.position.x > AIR.compound.west || w.g.position.y < -0.2)
 
   function goAir(w) {
     w.job = 'air'
@@ -311,7 +337,7 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items, air }
       return true
     },
     fell(w) {
-      if (!debarker.workers || forest.ground.length >= GAME.maxGroundLogs / 2) return false
+      if (!debarker.workers || forest.ground.length >= forest.maxLogs / 2) return false
       const t = forest.freeTree(w.g.position.x, w.g.position.z)
       if (!t) return false
       t.claim = w

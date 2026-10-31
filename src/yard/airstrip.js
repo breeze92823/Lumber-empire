@@ -1,4 +1,4 @@
-import { BoxGeometry, CircleGeometry, DoubleSide, ExtrudeGeometry, Group, InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, RepeatWrapping, Shape } from 'three'
+import { BoxGeometry, DoubleSide, ExtrudeGeometry, Group, InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, RepeatWrapping, Shape } from 'three'
 import * as sfx from '../audio/sfx.js'
 import { AIR, COARSE_POINTER, YARD } from '../config.js'
 import { createBursts } from '../particles.js'
@@ -170,36 +170,6 @@ function buildHangar() {
   return g
 }
 
-function buildTower() {
-  const g = new Group()
-  const concrete = matte('#d9d5cc')
-  const dark = matte('#2d3a55')
-  const glass = matte('#2b6da8', { roughness: 0.12, metalness: 0.4, emissive: '#2a5a8a', emissiveIntensity: 0.6 })
-  box(g, matte('#a9a59c'), 7, 0.5, 7, 0, 0.25, 0)
-  box(g, concrete, 5.6, 3.4, 5.6, 0, 1.9, 0)
-  bar(g, concrete, 1.9, 19, 0, 12.7, 0, 'y', 14)
-  for (let y = 5; y < 21; y += 2.6) box(g, glass, 0.5, 1, 0.1, 0, y, 1.9)
-  for (const y of [21.2, 22.3]) bar(g, dark, 2.5 + (y - 21.2) * 0.8, 0.5, 0, y, 0, 'y', 10)
-  bar(g, glass, 3.4, 2.6, 0, 23.8, 0, 'y', 10)
-  for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2
-    box(g, dark, 0.14, 2.6, 0.14, Math.sin(a) * 3.42, 23.8, Math.cos(a) * 3.42)
-  }
-  bar(g, dark, 3.9, 0.3, 0, 25.2, 0, 'y', 10)
-  bar(g, matte('#8a93a0'), 2.6, 0.4, 0, 25.6, 0, 'y', 10)
-  box(g, matte('#8a93a0'), 0.12, 3, 0.12, 1.4, 27, -1.2)
-  for (const y of [26.4, 27, 27.6]) box(g, matte('#8a93a0'), 0.9, 0.05, 0.05, 1.4, y, -1.2)
-  return g
-}
-
-function buildRadar() {
-  const g = new Group()
-  box(g, matte('#8a93a0'), 0.24, 0.9, 0.24, 0, 0.45, 0)
-  box(g, matte('#f4f5f7'), 2.8, 0.7, 0.12, 0, 1.1, 0.18, 0, 0.25)
-  box(g, matte('#d33b2c'), 0.5, 0.2, 0.3, 0, 1.1, -0.1)
-  return g
-}
-
 function buildTanks() {
   const g = new Group()
   const white = matte('#eceff2')
@@ -331,28 +301,20 @@ export function buildAir(root, { items, lighting, stats, trucks, lines }) {
 
   // Bought or not, the same buildings stand here: black outlines until the airport is paid for.
   const H = AIR.hangar
-  const W = AIR.tower
   const A = AIR.tanks
   const real = new Group()
   real.visible = false
   scene.add(real)
-  const shapes = [silhouette(scene, buildHangar(), H.x, H.z), silhouette(scene, buildTower(), W.x, W.z), silhouette(scene, buildTanks(), A.x, A.z)]
+  const shapes = [silhouette(scene, buildHangar(), H.x, H.z), silhouette(scene, buildTanks(), A.x, A.z)]
   place(real, buildHangar(), H.x, H.z)
-  place(real, buildTower(), W.x, W.z)
   place(real, buildTanks(), A.x, A.z)
   place(real, buildClutter())
   solidBox(H.w / 2, H.h / 2, H.d / 2 + 0.5, H.x, H.h / 2, H.z)
-  solidBox(3.5, 3, 3.5, W.x, 3, W.z)
   solidBox(8, 3, 6.5, A.x, 3, A.z)
   for (const [x, z] of AIR.masts) {
     place(scene, buildMast(), x, z)
     solidBox(0.6, 3, 0.6, x, 3, z)
   }
-
-  const radar = place(real, buildRadar(), W.x + 1.4, W.z + 1, 0, 25.8)
-  const towerLamp = new Mesh(new CircleGeometry(0.5, 12), neon('#ff2a2a', 5, { side: DoubleSide }))
-  towerLamp.position.set(W.x + 1.4, 28.7, W.z - 1.2)
-  real.add(towerLamp)
 
   // Everything lit, off until the airport is bought.
   const lights = new Group()
@@ -540,8 +502,6 @@ export function buildAir(root, { items, lighting, stats, trucks, lines }) {
       if (COARSE_POINTER) scene.visible = you.x > AIR.fieldFrom
       if (!owned) return
       planes.update(dt, elapsed, you, lighting.isNight())
-      radar.rotation.y = elapsed * 1.6
-      towerLamp.visible = (elapsed * 0.9) % 1 < 0.45
       for (let i = 0; i < rings.length; i++) {
         const k = i / rings.length
         const sway = Math.sin(elapsed * 1.8 + k * 3) * (0.1 + k * 0.5)
