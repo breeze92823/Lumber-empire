@@ -6,7 +6,7 @@ import { createGifts } from './gifts.js'
 import { createHire } from './hire.js'
 import { createRebirth } from './rebirth.js'
 
-export { closeTopWindow, setWindowReserved } from './shell.js'
+export { anyWindowOpen, closeTopWindow, setWindowReserved } from './shell.js'
 
 // The game's popup windows. The HUD tiles open Gifts, Rebirth and Index; walking onto the HIRE
 // or UPGRADE ring opens its window and walking off closes it, so no key is needed on any device.

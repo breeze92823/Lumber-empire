@@ -1,5 +1,6 @@
 import { GAME, WINDOWS, YARD } from './config.js'
 import { inputState } from './input.js'
+import { registerZone } from './interact.js'
 import { player, respawn } from './player.js'
 import { createShop } from './shop.js'
 import { book, career, raiseUpgrade, stats, upgradeCost } from './stats.js'
@@ -215,20 +216,24 @@ export function createGame({ yard, hud }) {
     }
   }
 
-  function updateRings() {
+  // Buy rings: standing in one shows "Press E to buy X"; holding E buys it (a click on its sign still does too).
+  const ringAt = () => {
     const p = player.position
     const level = floorAt(p.y)
-    let pressed = false // rings stack on one spot: a step buys one, the next waits for a new step
-    for (const ring of buyRings) {
-      // Tracked while hidden too: a ring that appears underfoot must not buy on the spot.
-      const now = (ring.spec.floor ?? 0) === level && Math.hypot(ring.spec.x - p.x, ring.spec.z - p.z) < ring.spec.r
-      if (now && !ring.inside && !ring.off && !pressed) {
-        sfx[purchase(ring.spec.buy)]()
-        pressed = true
-      }
-      ring.inside = now
-    }
+    return buyRings.find((r) => !r.off && (r.spec.floor ?? 0) === level && Math.hypot(r.spec.x - p.x, r.spec.z - p.z) < r.spec.r)
   }
+  registerZone({
+    id: 'buyRing',
+    isNear: () => !!ringAt(),
+    label() {
+      const sale = sales.get(ringAt()?.spec.buy)
+      return sale ? `buy ${sale.title} (${sale.price})` : null
+    },
+    onConfirm() {
+      const ring = ringAt()
+      if (ring) sfx[purchase(ring.spec.buy)]()
+    },
+  })
 
   function updateHint() {
     let hint = null
@@ -325,7 +330,6 @@ export function createGame({ yard, hud }) {
       yard.update(dt, elapsed, camera, player.position)
       updateAxe(dt)
       updateHands(dt)
-      updateRings()
       shop.update(dt)
       drawCarried()
       out.onDraw?.(items)

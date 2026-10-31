@@ -14,6 +14,8 @@ veil.hidden = true
 veil.addEventListener('pointerdown', () => closeTopWindow())
 document.body.append(veil)
 
+export const anyWindowOpen = () => !!current
+
 // Closes the open window. Returns true if there was one (so Esc can stop there).
 export function closeTopWindow() {
   if (!current) return false
