@@ -1,18 +1,21 @@
-import { GAME, YARD } from '../config.js'
+import { AIR, GAME, YARD } from '../config.js'
 
 // What a yard has bought, as data: which sales stand, what each one did to the yard, and how to get
 // from one state to another. The player's purchases (game.js), a loaded save and a neighbour's
 // yard all go through here, so what a sale does is written once. Nothing here touches money.
 const FLOOR_SALE = [null, 'secondFloor', 'thirdFloor'] // what opens each floor
-const UNLOCKS = [[1, 'Rebirth 1'], [2, 'Rebirth 2'], [5, 'Rebirth 5']] // the padlocks a rebirth count takes off
+const UNLOCKS = [[1, 'Rebirth 1'], [2, 'Rebirth 2'], [3, 'Rebirth 3'], [5, 'Rebirth 5']] // the padlocks a rebirth count takes off
 
 export function createPlot(yard, { book, notify = null, setBelts = null, onWipe = null, onFloor = null }) {
-  const { boards, feeds, floors, forest, items, lifters, lines, mills, sky, stations, train, trucks } = yard
+  const { air, boards, feeds, floors, forest, items, lifters, lines, mills, sky, stations, train, trucks } = yard
   const owned = new Set()
   const perks = new Set() // the shop's Hacker and OP Truck: they outlive a rebirth
   const buyRings = YARD.rings.filter((r) => r.buy).map((spec) => ({ spec, inside: false }))
   const sellRings = YARD.rings.filter((r) => r.sell != null)
   const logsRings = YARD.rings.filter((r) => r.logsIn) // by floor
+  const cargoRings = { pile: YARD.rings.find((r) => r.cargo === 'pile'), belt: YARD.rings.find((r) => r.cargo === 'belt') }
+  const hangarRing = YARD.rings.find((r) => r.text === 'HANGAR')
+  const linksRing = YARD.rings.find((r) => r.text === 'LINKS')
   let rebirths = 0
   let quiet = false // replaying a state: no notices, and the crew limits come with the save
 
@@ -96,6 +99,25 @@ export function createPlot(yard, { book, notify = null, setBelts = null, onWipe 
       train.own()
       mills[0].showTrainBelt(true)
     },
+    // A neighbour's yard has none of these: its copy keeps the hatch shut.
+    tunnel() {
+      air?.tunnel.dig(quiet)
+      say('The tunnel is open: follow it east, under the fence')
+    },
+    airstrip() {
+      air?.buy(quiet)
+      showRing(cargoRings.pile, true)
+      showRing(hangarRing, true)
+      say('The Airport is yours! Your first freighter is on its way in')
+    },
+    airBelt() {
+      air?.buildBelt()
+      showRing(cargoRings.belt, true)
+      showRing(linksRing, true)
+      say('Cargo belts built: open the LINKS ring to connect your machines to the planes')
+    },
+    airBeltFast: () => air?.setBoost(AIR.belt.boost),
+    ...Object.fromEntries(AIR.links.map(({ id, stage }) => [id, (f) => air?.links.build(f, stage)])),
   }
 
   // Which signs stand right now: not bought, rebirths reached, and any `later` one's `needs` owned.
@@ -103,6 +125,7 @@ export function createPlot(yard, { book, notify = null, setBelts = null, onWipe 
     for (const s of YARD.saleSigns) {
       const open = !s.floor || owned.has(FLOOR_SALE[s.floor])
       const on = open && !owned.has(s.id) && rebirths >= (s.rebirth ?? 0) && (!s.later || owned.has(s.needs))
+      if (s.panel) continue // sold in a window, nothing stands in the world
       boards.showSign(s.id, on)
       const ring = buyRings.find((r) => r.spec.buy === s.id)
       ring.off = !on
@@ -114,6 +137,7 @@ export function createPlot(yard, { book, notify = null, setBelts = null, onWipe 
   function hideExtraRings() {
     for (const ring of sellRings) if (ring.sell > 0) showRing(ring, false)
     for (const ring of logsRings) showRing(ring, false)
+    for (const ring of [cargoRings.pile, cargoRings.belt, hangarRing, linksRing]) showRing(ring, false)
   }
 
   function apply(id) {
@@ -142,6 +166,7 @@ export function createPlot(yard, { book, notify = null, setBelts = null, onWipe 
     buyRings,
     sellRings,
     logsRings,
+    cargoRings,
     get rebirths() {
       return rebirths
     },
@@ -172,6 +197,7 @@ export function createPlot(yard, { book, notify = null, setBelts = null, onWipe 
       train.reset()
       forest.reset()
       trucks.reset()
+      air?.reset()
       yard.workers.clear()
       floors.reset()
       hideExtraRings()

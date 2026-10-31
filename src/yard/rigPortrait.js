@@ -1,11 +1,19 @@
 import { Color, DirectionalLight, PerspectiveCamera, Scene, Vector2 } from 'three'
-import { GAME, WINDOWS } from '../config.js'
+import { AIR, GAME, WINDOWS } from '../config.js'
+import { buildPlane } from './aircraft.js'
 import { rigShowpiece } from './rigModels.js'
 
-// The Truck Depot's pictures: each truck of the Truck Level drawn once into a canvas of its own.
-// It renders to the corner of the game's canvas and copies that out, so call it before the first
-// frame, while the loading screen still covers it.
-export function rigPortraits(renderer, environment) {
+// The Truck Depot's and the Hangar's pictures: each truck of the Truck Level and each plane of the
+// Aircraft Level drawn once into a canvas of its own. They render to the corner of the game's canvas
+// and copy that out, so call them before the first frame, while the loading screen still covers it.
+export const rigPortraits = (renderer, environment) => portraits(renderer, environment, GAME.trucks.levels, ({ rig }) => ({ model: rigShowpiece(rig), far: WINDOWS.depot.portrait.distance, y: 1.9 }))
+export const planePortraits = (renderer, environment) =>
+  portraits(renderer, environment, GAME.aircraft, ({ plane }) => {
+    const { root, spec } = buildPlane(plane)
+    return { model: root, far: AIR.planes[plane].len * WINDOWS.hangar.portraitDistance, y: spec.gear + spec.r }
+  })
+
+function portraits(renderer, environment, list, build) {
   const P = WINDOWS.depot.portrait
   const scene = new Scene()
   scene.background = new Color(P.background)
@@ -18,12 +26,11 @@ export function rigPortraits(renderer, environment) {
   const ratio = renderer.getPixelRatio()
   const side = Math.min(P.size / ratio, size.x, size.y)
   renderer.setViewport(0, 0, side, side)
-  const shots = GAME.trucks.levels.map(({ rig }) => {
-    const model = rigShowpiece(rig)
+  const shots = list.map((entry) => {
+    const { model, far, y } = build(entry)
     scene.add(model)
-    const far = P.distance
     camera.position.set(far * 0.72, far * 0.34, far * 0.82)
-    camera.lookAt(0, 1.9, 0)
+    camera.lookAt(0, y, 0)
     renderer.render(scene, camera)
     scene.remove(model)
     const canvas = document.createElement('canvas')

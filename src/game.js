@@ -13,7 +13,7 @@ import * as sfx from './audio/sfx.js'
 const noticeGap = 3 // s before the same complaint can show again
 
 export function createGame({ yard, hud }) {
-  const { boards, forest, items, lines, train, trucks } = yard
+  const { air, boards, forest, items, lines, train, trucks } = yard
   const [line] = lines
   const { stages } = line
   const sales = new Map(YARD.saleSigns.map((s) => [s.id, s]))
@@ -26,7 +26,7 @@ export function createGame({ yard, hud }) {
     onWipe: () => shop.keep(),
     onFloor: (n) => out.onFloor?.(n),
   })
-  const { buyRings, logsRings, owned, sellRings } = plot
+  const { buyRings, cargoRings, logsRings, owned, sellRings } = plot
 
   const carried = []
   let axeOn = true
@@ -54,6 +54,11 @@ export function createGame({ yard, hud }) {
       trucks.repaint()
       trucks.refit()
       hud.notify(`New truck: ${GAME.trucks.levels[stats.truckLevel].name}!`)
+    }
+    if (id === 'aircraft') {
+      const swapped = air.planes.refit()
+      if (swapped) sfx.reward()
+      hud.notify(`New aircraft: ${GAME.aircraft[stats.aircraft].name}!${swapped ? '' : ' It comes in on the next flight'}`)
     }
     boards.repaint()
     boards.refreshPrices(hud.money)
@@ -177,6 +182,21 @@ export function createGame({ yard, hud }) {
     }
 
     const logAt = lastLog()
+    // The airstrip's two CARGO rings: the pile, and the hopper once the Tunnel Conveyor stands.
+    if (air?.open && logAt >= 0) {
+      const inside = (ring) => Math.hypot(ring.x - p.x, ring.z - p.z) < ring.r + 0.4
+      const toBelt = air.belted && inside(cargoRings.belt)
+      if (toBelt || inside(cargoRings.pile)) {
+        if (toBelt ? air.tipBelt(carried[logAt]) : air.tipPile(carried[logAt], hands)) {
+          carried.splice(logAt, 1)
+          handsLeft = GAME.loadEvery
+          sfx.pick()
+        } else if (air.room <= 0) {
+          complain('The cargo pile is full: wait for the plane')
+        }
+        return
+      }
+    }
     const logsRing = logsRings[level]
     if (here.stages[0].owned && logAt >= 0 && Math.hypot(logsRing.x - p.x, logsRing.z - p.z) < logsRing.r + 0.4) {
       if (here.feed(carried[logAt], hands)) {
@@ -272,6 +292,14 @@ export function createGame({ yard, hud }) {
     sfx.sell()
   }
   trucks.onLucky = ({ name, mult }) => hud.notify(`A ${name} TRUCK pulled in! Everything on it pays x${mult}`)
+  if (air) {
+    air.planes.onFlight = ({ value, count, name, full }) => {
+      const paid = Math.round(value * shop.cash)
+      hud.earn(paid)
+      hud.notify(`${name} is away with ${count} items${full ? ', a full load' : ''}: +$${paid.toLocaleString('en-US')}`)
+    }
+    air.planes.onDocked = () => hud.notify('The freighter is on the stand: load it up')
+  }
 
   // A real rebirth: the whole plot goes. Skipping one for money keeps it.
   function wipePlot() {

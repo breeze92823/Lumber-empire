@@ -24,7 +24,7 @@ const STROKE = 1.2
 const PICK = 1.4 // m short of the head that items stop, so a whole one lies on the belt
 
 // A group lying along a to b, local +Z running with the belt, and how long it is.
-function along([ax, ay, az], [bx, by, bz]) {
+export function along([ax, ay, az], [bx, by, bz]) {
   const g = new Group()
   g.position.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2)
   g.rotation.order = 'YXZ'

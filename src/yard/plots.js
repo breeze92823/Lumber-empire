@@ -35,7 +35,7 @@ function buildYardPlot(scene, lighting, floor) {
   const holder = createHolder()
   setHolder(holder)
   const yard = buildYard(group, lighting, { book, remote: true, view })
-  landColliders()
+  landColliders(true)
   setHolder(null)
   group.add(floor())
   const plot = createPlot(yard, { book })

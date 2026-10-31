@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferGeometry, CanvasTexture, Color, Float32BufferAttribute, NormalBlending, Points, ShaderMaterial, SRGBColorSpace } from 'three'
+import { AdditiveBlending, BufferGeometry, CanvasTexture, Color, DynamicDrawUsage, Float32BufferAttribute, NormalBlending, Points, ShaderMaterial, SRGBColorSpace } from 'three'
 import { mulberry32, paintSoftDot, paintSparkle } from './textures.js'
 
 // GPU particles. Each emitter is one Points object whose particles loop
@@ -134,6 +134,91 @@ export function removeEmitter(points) {
   points.removeFromParent()
   points.geometry.dispose()
   points.material.dispose()
+}
+
+// One-shots, for what an endless loop can't do: a blast, a tyre puff, dust left behind on a runway.
+// One Points object per pool; each particle is plain data stepped here, so spawn() is free to call
+// from anywhere and an idle pool costs nothing but its draw call.
+const burstVertex = /* glsl */ `
+  uniform float uViewport;
+  attribute vec2 look; // x: size in metres, y: alpha
+  attribute vec3 tint;
+  varying float vAlpha;
+  varying vec3 vTint;
+  void main() {
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mv;
+    vAlpha = look.y;
+    vTint = tint;
+    gl_PointSize = look.x * projectionMatrix[1][1] * 0.5 * uViewport / max(-mv.z, 0.1);
+  }`
+
+const burstColor = new Color()
+export function createBursts(scene, { count, additive = false, intensity = 1 }) {
+  const pos = new Float32Array(count * 3)
+  const look = new Float32Array(count * 2)
+  const tint = new Float32Array(count * 3)
+  const list = Array.from({ length: count }, () => ({ age: 1, life: 0 }))
+  const geo = new BufferGeometry()
+  const attrs = { pos: new Float32BufferAttribute(pos, 3), look: new Float32BufferAttribute(look, 2), tint: new Float32BufferAttribute(tint, 3) }
+  for (const a of Object.values(attrs)) a.setUsage(DynamicDrawUsage)
+  geo.setAttribute('position', attrs.pos)
+  geo.setAttribute('look', attrs.look)
+  geo.setAttribute('tint', attrs.tint)
+  const points = new Points(geo, new ShaderMaterial({
+    uniforms: { uViewport: shared.uViewport, map: { value: spriteTextures().dot }, uIntensity: { value: intensity }, uOpacity: { value: 1 } },
+    vertexShader: burstVertex,
+    fragmentShader,
+    transparent: true,
+    depthWrite: false,
+    blending: additive ? AdditiveBlending : NormalBlending,
+  }))
+  points.frustumCulled = false
+  points.renderOrder = 2
+  scene.add(points)
+  let next = 0
+  let alive = 0
+  return {
+    // o: { x, y, z, vx, vy, vz, life (s), size (m), grow (size multiplier by the end), color,
+    // opacity, gravity (m/s^2, down), drag (1/s) }
+    spawn(o) {
+      if (Math.random() > density) return
+      const p = list[next]
+      next = (next + 1) % count
+      Object.assign(p, { age: 0, life: o.life ?? 1, x: o.x, y: o.y, z: o.z, vx: o.vx ?? 0, vy: o.vy ?? 0, vz: o.vz ?? 0, size: o.size ?? 0.5, grow: o.grow ?? 1, opacity: o.opacity ?? 1, gravity: o.gravity ?? 0, drag: o.drag ?? 0 })
+      burstColor.set(o.color ?? '#ffffff')
+      p.r = burstColor.r
+      p.g = burstColor.g
+      p.b = burstColor.b
+      alive = count
+    },
+    update(dt) {
+      if (!alive) return
+      alive = 0
+      for (let i = 0; i < count; i++) {
+        const p = list[i]
+        if (p.age >= p.life) {
+          look[i * 2 + 1] = 0
+          continue
+        }
+        alive++
+        p.age += dt
+        const k = Math.min(p.age / p.life, 1)
+        const slow = Math.exp(-p.drag * dt)
+        p.vx *= slow
+        p.vy = p.vy * slow - p.gravity * dt
+        p.vz *= slow
+        p.x += p.vx * dt
+        p.y += p.vy * dt
+        p.z += p.vz * dt
+        pos.set([p.x, p.y, p.z], i * 3)
+        tint.set([p.r, p.g, p.b], i * 3)
+        look[i * 2] = p.size * (1 + (p.grow - 1) * k)
+        look[i * 2 + 1] = p.opacity * Math.min(1, k * 8) * (1 - k)
+      }
+      attrs.pos.needsUpdate = attrs.look.needsUpdate = attrs.tint.needsUpdate = true
+    },
+  }
 }
 
 // 0..1 share of every emitter's particles that are drawn (graphics preset).

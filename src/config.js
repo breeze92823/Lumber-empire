@@ -361,7 +361,7 @@ export const YARD = {
     big: [[29.5, 24.5], [33, 32.5]], // start out as Big Trees
 
     golden: [[31.5, -29.5]],
-    stumps: [[23.4, -9.5], [24, 2], [25, 15]],
+    stumps: [[23.4, -9.5], [23.6, -7], [25, 15]],
     clear: 3.2, // m of space kept round each planted tree and the More Forest ring
     foliage: ['#14593a', '#5fd085'],
     goldFoliage: ['#b6892a', '#e0bf56'],
@@ -464,6 +464,134 @@ YARD.floors.priceMult.forEach((k, i) => {
   YARD.rings.push({ ...groundRings.find((r) => r.logsIn), y, floor })
 })
 
+// The way east and the airport. All of it stands in the player's own yard only, like the Leaderboard
+// (a neighbour's yard keeps the closed hatch and nothing else), so none of it goes through yard/sync.js.
+// A trench runs east from the forest down to a tunnel under the fence and the far trees, and a second
+// one climbs out on the apron. The floor colliders have holes there (world.js), the lawn too. The
+// airport is laid out round its biggest plane: AIR.planes.titan, 44 m across the wings.
+const STAGE_LINKS = [
+  { id: 'link0', stage: 0, name: 'Debarker', sale: 'debarker', price: 20000 },
+  { id: 'link1', stage: 1, name: 'Sawmill', sale: 'sawmill', price: 30000 },
+  { id: 'link2', stage: 2, name: 'Kiln', sale: 'kiln', price: 50000 },
+  { id: 'link3', stage: 3, name: 'Bundler', sale: 'bundler', price: 90000 },
+  { id: 'link4', stage: 4, name: 'Workshop', sale: 'workshop', price: 150000 },
+]
+export const AIR = {
+  rebirth: 3, // rebirths before the tunnel can be dug
+  tunnel: {
+    z: 4.5, half: 4, // its middle and half its width
+    west: 25, portal: 36.5, // the trench: lawn level at `west`, tunnel level at `portal`
+    east: 75, top: 86.5, // the tunnel's far end, and where the far trench comes up
+    floor: -6, roof: -2, // the roof is the underside of the floor collider
+    keepClear: 2.4, // m of forest kept off the trench
+    lampEvery: 6.5, // m between timber sets, each with a lamp
+    lane: 5.9, // z workers walk it on; they spread by a little each
+  },
+  // The perimeter fence goes all the way round the runway: the biggest plane's wing tips pass inside
+  // it on the runway and at the west end of its turn, and it is airborne before the east fence.
+  // `north` and `south` stay inside PLOTS.band, so nothing of the next yard stands in here.
+  compound: { west: 72, east: 566, north: -45, south: 64.5, postEvery: 6, height: 3.4, block: 3.4, tile: 120 },
+  apron: { west: 86.5, east: 236, north: -44, south: 31, color: '#b9bcc0', line: '#f2c21c' },
+  runway: { z: 41, half: 10, west: 96, east: 542, color: '#3a3f4b', edgeEvery: 24, dashEvery: 22 },
+  stand: { z: 5, lip: 122 }, // planes stop with the end of their lowered ramp at x = lip
+  // The taxi route, corners and radius: stand > east along the apron > S-bend > runway heading east.
+  taxi: { turn: 18, east: 178, hold: 214, back: 118 },
+  // Fixed spots on the apron.
+  hangar: { x: 152, z: -32.5, w: 64, d: 24, h: 20 },
+  tower: { x: 95, z: -32 },
+  tanks: { x: 206, z: -32 },
+  sock: { x: 240, z: 27 },
+  masts: [[90, -42], [232, -42], [90, 27], [232, 27], [330, 56], [450, 56], [330, 27], [450, 27]],
+  // The steel bunker logs and goods wait in, and how many of what's in it show over its walls.
+  pile: { x: 108, z: 0.4, stand: [103.4, 3.9], max: 240, show: 24, wall: 2.4, w: 6, d: 6 },
+  // The telescopic boom from the bunker to a plane's ramp. It draws back while a plane turns in.
+  loader: { foot: [111.6, 0.9, 1.6], head: [121.2, 1.9, 5], back: 5.4, speed: 13, gap: 1.9, width: 1.2, slide: 2.2 },
+  // The Tunnel Conveyor, [x, y, z] of the belt surface: down the north side of the trench, along the
+  // tunnel and up the far trench to the head of the bunker. `gap` keeps logs apart.
+  belt: {
+    path: [[23.2, 0.95, 1.4], [25, 0.95, 1.4], [36.5, -5.05, 1.4], [75, -5.05, 1.4], [86.5, 0.95, 1.4], [104.4, 0.95, 1.4]],
+    width: 1.5, speed: 3.4, boost: 3, gap: 3.3, cleatEvery: 1.2,
+  },
+  // The Cargo Trunk: bought with the Tunnel Conveyor, on stilts up the east side of the line from the
+  // Workshop's corner to a chute over the hopper. Each stage's Air Link joins it `spur` along.
+  trunk: {
+    path: [[-9.1, 5, 44], [19.9, 5, 44], [19.9, 5, 1.4], [22.3, 3.5, 1.4]],
+    legEvery: 8, width: 1.3,
+    spur: 3.75, // m of z a link slants past the end of its machine's belt, clear of the lifter towers
+    shaftTop: 2.6, // m a link's drop shaft stands above the highest floor
+    from: 5.7, // where a link's run ends over the trunk
+    backlog: 3, // items the next machine must have to get through before a link takes one: only what it can't keep up with leaves the line
+    kick: 0.35, // s the diverter arm is across the belt
+  },
+  links: STAGE_LINKS,
+  sales: [
+    { id: 'tunnel', own: true, x: 27.8, z: 4.5, title: 'Dig Tunnel', price: '$75,000', yaw: -Math.PI / 2, needs: 'sawmill', rebirth: 3 },
+    { id: 'airstrip', own: true, x: 93, z: 4.5, title: 'Airport', price: '$150,000', yaw: -Math.PI / 2, needs: 'tunnel', later: true, rebirth: 3 },
+    { id: 'airBelt', own: true, x: 25, z: -3.4, title: 'Tunnel Conveyor', price: '$60,000', yaw: -Math.PI / 2, needs: 'airstrip', later: true, rebirth: 3 },
+    { id: 'airBeltFast', own: true, x: 25, z: -3.4, title: 'x3 Cargo Belts', price: '$400,000', yaw: -Math.PI / 2, needs: 'airBelt', later: true, rebirth: 3 },
+  ],
+  rings: [
+    { own: true, x: 24.3, z: 4.5, r: 1.5, color: '#f2d531', text: 'EXPAND', yaw: Math.PI / 2, buy: 'tunnel' },
+    { own: true, x: 89.8, z: 4.5, r: 1.8, color: '#f2d531', text: 'EXPAND', yaw: Math.PI / 2, buy: 'airstrip' },
+    { own: true, x: 21.9, z: -3.4, r: 1.5, color: '#25c7f2', text: 'BUY', yaw: Math.PI / 2, buy: 'airBelt' },
+    { own: true, x: 21.9, z: -3.4, r: 1.5, color: '#25c7f2', text: 'BUY', yaw: Math.PI / 2, buy: 'airBeltFast' },
+    { own: true, x: 103.4, z: 5.6, r: 1.9, color: '#f2c531', text: 'CARGO', yaw: Math.PI / 2, dark: true, cargo: 'pile' },
+    { own: true, x: 20.6, z: 1.4, r: 1.5, color: '#f2c531', text: 'CARGO', yaw: Math.PI / 2, dark: true, cargo: 'belt' },
+    { own: true, x: 152, z: -14.5, r: 2.4, color: '#25c7f2', text: 'HANGAR', yaw: 0.05 },
+    { own: true, x: 18.4, z: -10.4, r: 1.7, color: '#25c7f2', text: 'LINKS', yaw: Math.PI / 2 },
+  ],
+  // The models (yard/aircraft.js), nose along +Z. No windows behind the flight deck: these carry wood.
+  // `w` / `h` = half the hold's width and height, `box` = how square its corners are (2 = round),
+  // `gear` = wheels to belly, `bogies` = wheels a side, `tail` = 'twin', 'fin' or 'T'.
+  planes: {
+    mule: { len: 16, w: 1.55, h: 1.55, box: 6, span: 23, chord: [3, 1.5], sweep: 0, gear: 1.3, tail: 'twin', fixed: true, bogies: 1, tyre: 0.72, paint: '#e7b416', trim: '#2b2d33', belly: '#4b4f58', stripe: '#c92f26', engines: [{ type: 'prop', x: 4.4, blades: 4, r: 2 }, { type: 'prop', x: -4.4, blades: 4, r: 2 }] },
+    hauler: { len: 25, w: 2.4, h: 2.4, box: 3.4, span: 34, chord: [4.6, 2.2], sweep: 0.7, gear: 0.95, tail: 'fin', bogies: 2, tyre: 0.7, paint: '#7c8a5a', trim: '#e0a722', belly: '#4b5637', stripe: '#2b2d33', engines: [{ type: 'prop', x: 6, blades: 6, r: 2.3 }, { type: 'prop', x: -6, blades: 6, r: 2.3 }, { type: 'prop', x: 11.4, blades: 6, r: 2.3 }, { type: 'prop', x: -11.4, blades: 6, r: 2.3 }] },
+    lifter: { len: 33, w: 3.1, h: 3.2, box: 3, span: 39, chord: [6.4, 2.2], sweep: 5.2, gear: 1.2, tail: 'T', bogies: 3, tyre: 0.82, paint: '#e4e7ea', trim: '#b5261e', belly: '#8f949c', stripe: '#2b2d33', winglet: true, engines: [{ type: 'jet', x: 7.6, r: 1.25, len: 5 }, { type: 'jet', x: -7.6, r: 1.25, len: 5 }, { type: 'jet', x: 13.2, r: 1.25, len: 5 }, { type: 'jet', x: -13.2, r: 1.25, len: 5 }] },
+    titan: { len: 41, w: 3.9, h: 4, box: 2.8, span: 44, chord: [8.4, 2.6], sweep: 6.8, gear: 1.5, tail: 'T', bogies: 4, tyre: 0.98, paint: '#25406e', trim: '#e0a722', belly: '#b9bcc0', stripe: '#f4f5f7', winglet: true, engines: [{ type: 'jet', x: 8.6, r: 1.75, len: 6.6 }, { type: 'jet', x: -8.6, r: 1.75, len: 6.6 }, { type: 'jet', x: 15, r: 1.75, len: 6.6 }, { type: 'jet', x: -15, r: 1.75, len: 6.6 }] },
+  },
+  // The flight, m/s and m. `rotate` = speed it lifts off at, `climb` = rad up, `top` = height it is
+  // gone at, `from` / `down` = where the approach starts and where the wheels touch.
+  flight: {
+    taxi: 15, taxiBack: 34, turnSpeed: 10, accel: 14, brake: 8, rollBrake: 7,
+    rotate: 36, climb: 0.2, top: 190, spool: 1.1, away: 1000,
+    from: 1040, height: 118, down: 484, approach: 62, flare: 38,
+    ramp: 0.9, // s the ramp takes
+    settle: 0.5, // s a loaded plane stands with its ramp up before it taxis
+    stopFor: 16, // m ahead of the nose it stops for the player while taxiing
+  },
+  fx: {
+    motes: 70, drips: 14, // the tunnel's emitters
+    dust: 320, flames: 200, // the one-shot pools
+    blast: 70, // dust puffs when the hatch goes
+  },
+  fieldFrom: 30, // x past which a phone starts drawing the airport
+  crewEvery: 3, // every crewEvery-th worker (the second, the fifth...) takes logs to the planes
+  // What an item pays by air: `premium` times what it pays on a truck, and never less than `log`.
+  // The rebirths and the plane's full load bonus apply.
+  premium: 1.5,
+  log: 45,
+  patience: 30, // s after the first item before a plane goes with what it has (no full load bonus)
+  tip: 0.12, // s between items leaving the bunker
+}
+
+YARD.saleSigns.push(...AIR.sales)
+YARD.rings.push(...AIR.rings)
+YARD.alerts.push({ x: 152, y: 16, z: -14.5 })
+YARD.locked.push({ own: true, x: 30.75, z: 4.5, label: 'Rebirth 3', lockY: 5.2, labelY: 3.3, lock: 2.9, text: 1 })
+// The Air Links have no sign of their own: the LINKS window sells them, stage by stage and floor by
+// floor, at the floors' own prices.
+for (const l of STAGE_LINKS) {
+  ;[1, ...YARD.floors.priceMult].forEach((k, floor) => {
+    const tag = (id) => (floor ? `${id}@${floor}` : id)
+    YARD.saleSigns.push({ id: tag(l.id), own: true, panel: true, floor, title: `${l.name} Air Link`, price: money(l.price * k), needs: tag(l.sale), also: 'airBelt', later: true, rebirth: AIR.rebirth, x: 0, z: 0, yaw: 0 })
+  })
+}
+
+// Over the mouth of the trench.
+export const overShaft = (x, z, margin = 0) => x > AIR.tunnel.west - margin && x < AIR.tunnel.portal + margin && Math.abs(z - AIR.tunnel.z) < AIR.tunnel.half + margin
+// Inside the perimeter fence.
+export const insideAirport = (x, z) => x > AIR.compound.west && x < AIR.compound.east && z > AIR.compound.north && z < AIR.compound.south
+
 export const SPAWN = { x: 0, y: 0.05, z: 0 }
 export const SPAWN_FACING = Math.PI - 0.146 // yaw on spawn: north, a touch east like the reference view
 
@@ -487,6 +615,9 @@ export const GAME = {
     // The Truck Depot's two rows (windows/depot.js).
     truckLevel: { base: 0, step: 1, unit: '', price: 25000, growth: 10, max: 3 }, // into GAME.trucks.levels
     delivery: { base: 9, step: -1.2, unit: 's', price: 500, growth: 4, max: 5 }, // s a truck is gone
+    // The Hangar's two rows (windows/hangar.js).
+    aircraft: { base: 0, step: 1, unit: '', price: 120000, growth: 8, max: 3 }, // into GAME.aircraft
+    flightTime: { base: 20, step: -3, unit: 's', price: 15000, growth: 3, max: 5 }, // s a plane is out of sight
   },
   speedPerPoint: 1 / 16, // PHYSICS speeds are for the board's starting 16
   workerSpeedPerPoint: 1 / 3, // m/s per point of Worker Speed
@@ -655,6 +786,16 @@ export const GAME = {
     bays: [{ x: -14.4, z: 0.8 }, { x: -14.4, z: 13 }, { x: -14.4, z: 23.4 }], // those bought, in order
   },
 
+  // By Aircraft Level, as GAME.trucks.levels: `items` a flight, `bonus` = % paid on top of a full load.
+  // `plane` names AIR.planes. A flight takes about a minute and carries a truck's load many times
+  // over: even the first moves twice what a Starter Truck does, the last more than the OP Truck.
+  aircraft: [
+    { name: 'SKY MULE', items: 60, bonus: 20, plane: 'mule' },
+    { name: 'TIMBER HAULER', items: 110, bonus: 60, plane: 'hauler' },
+    { name: 'IRON LIFTER', items: 180, bonus: 120, plane: 'lifter' },
+    { name: 'TITAN FREIGHTER', items: 300, bonus: 200, plane: 'titan' },
+  ],
+
   // The crew crosses the line round its north end: `passage` is the two corners. Every
   // `haulEvery`-th worker hauls pallets before anything else, and once a pallet holds `haulAt`
   // items all of them do: goods waiting there earn nothing, more logs only add to the wait.
@@ -744,7 +885,7 @@ export const AUDIO = {
   air: [420, 5200], // Hz a sound is low-passed to at the far end of its range and right beside it
   width: 0.7, // how far a sound off to one side pans
   // One-shots.
-  ranges: { chop: [7, 30], fall: [14, 52], land: [3, 14], horn: [10, 38], air: [5, 22] },
+  ranges: { chop: [7, 30], fall: [14, 52], land: [3, 14], horn: [10, 38], air: [5, 22], blast: [14, 90], door: [6, 46], touch: [24, 190], hold: [5, 32], kick: [3, 18] },
   // The running sounds (loops.js). `level` beside it, `rate` playback speed from stopped to flat out.
   // Only the nearest of a kind plays, and a machine only sounds while it has work inside it.
   voices: {
@@ -756,6 +897,8 @@ export const AUDIO = {
     belt: { level: 0.3, range: [1.5, 7] },
     diesel: { level: 0.7, range: [7, 30], idle: 0.3, idleRange: [2.5, 9], rate: [0.75, 1.75] },
     train: { level: 0.8, range: [8, 33], rate: [0.65, 1.2] },
+    prop: { level: 0.8, range: [22, 240], rate: [0.45, 1.25] },
+    jet: { level: 0.85, range: [26, 280], rate: [0.5, 1.2] },
   },
   turbo: { rate: 1.14, level: 1.2 }, // the Debarker once it is the Turbo
   spin: { up: 0.6, down: 1.4, droop: 0.82 }, // s to run up and down, and the pitch it runs down to
@@ -778,6 +921,9 @@ export const AUDIO = {
     night: 0.65, // how much of the wind is left at night
     gust: [5, 13], // s between changes of the wind
     calls: [22, 55], // s between a bird far off
+    tunnel: 0.5, // the hum of the rock round the tunnel
+    drips: [1.6, 5], // s between drops falling in the dark
+    echo: 0.55, // reverb on feet underground
   },
 
   maxVoices: 48, // one-shot sounds at once before low-priority ones are skipped
@@ -816,7 +962,7 @@ export const WINDOWS = {
   rebirth: {
     goal: 20000, // money the first rebirth needs
     goalGrowth: 2, // each rebirth multiplies the goal
-    unlocks: ['THE WORKSHOP', 'TRUCK BAY 3, BAY 2 CONVEYER AND TRAIN LOADER', 'BAY 3 CONVEYER', null, 'TRUCK BAY 4 AND BAY 4 CONVEYER'], // what rebirth n + 1 opens, in order
+    unlocks: ['THE WORKSHOP', 'TRUCK BAY 3, BAY 2 CONVEYER AND TRAIN LOADER', 'BAY 3 CONVEYER, THE TUNNEL AND THE AIRPORT', null, 'TRUCK BAY 4 AND BAY 4 CONVEYER'], // what rebirth n + 1 opens, in order
   },
   hire: {
     workers: 0, // the crew starts empty: the first worker is bought at the HIRE ring
@@ -829,6 +975,7 @@ export const WINDOWS = {
     lucky: [{ name: 'GOLD', chance: 15, mult: 2, color: '#ffd84a' }, { name: 'RAINBOW', chance: 5, mult: 5, rainbow: true }],
     portrait: { size: 320, fov: 26, distance: 21, sun: 2.6, background: '#26201e' },
   },
+  hangar: { portraitDistance: 2.15 }, // the plane's length times this
   // A nameless entry shows as ???; `owned` = how many the player has.
   index: {
     note: 'All your workers become your best <em>employee</em>! Get crates from the <em>train</em>',
@@ -873,7 +1020,7 @@ export const PHYSICS = {
   maxSlope: 50, // degrees the player can walk up
   snapToGround: 0.4, // m the controller stays glued to downward steps and slopes
   pushMass: 80, // kg the character weighs when shoving crates
-  killY: -6, // sank this far: respawn
+  killY: -14, // sank this far: respawn. Under the tunnel's floor (AIR.tunnel)
 }
 export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // capsule the character controller moves
 
@@ -995,6 +1142,7 @@ export const CAMERA = {
   speedFov: 6, // degrees the FOV widens at sprint speed
   speedEase: 3, // 1/s the speed framing eases in and out
   clearEase: 6, // 1/s the boom eases back out once a wall stops blocking it
+  shakeFade: 5, // 1/s a shake dies away
 }
 
 // --- Bloxity (bloxity.js, avatar/) -------------------------------------------------
