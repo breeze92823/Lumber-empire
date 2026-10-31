@@ -1,13 +1,14 @@
 import { Group, Mesh, MeshStandardMaterial, PlaneGeometry } from 'three'
-import { NET, PLOTS, YARD } from '../config.js'
+import { COARSE_POINTER, LIGHT, PLOTS, YARD } from '../config.js'
 import { createHolder, setHolder } from '../physics.js'
-import { label, yawQuat } from '../propkit.js'
+import { fontReady, label, yawQuat } from '../propkit.js'
 import { createBook } from '../stats.js'
 import { landColliders } from '../world.js'
 import { buildYard } from './index.js'
 import { itemCode } from './items.js'
 import { buildRailroad } from './perimeter.js'
 import { createPlot } from './plot.js'
+import { bakeYard, createAtlas, disposeBake } from './standIn.js'
 import { restoreFast, restoreSlow } from './sync.js'
 
 // The five yards round the player's own. Each is the same yard built by buildYard into a group, with
@@ -18,11 +19,17 @@ import { restoreFast, restoreSlow } from './sync.js'
 // and the others stand where they stand relative to it. Which slot is ours is only known once the
 // server answers, so until then the others wait as if we had slot 0; moving a yard is just its
 // group and the one body its colliders hang from.
+//
+// Five whole yards are far more than the frame can carry, and they all stand within 70 m, so only
+// the ones the viewer is at are ever real (`live`): their group is in the scene and runs every frame.
+// The rest are out of the scene, stopped, with a stand-in (standIn.js) in `shell` where they stand,
+// and their owners' frames just wait in `fastFrame` and `slowFrame`. Colliders stay either way.
 const FAR = { x: 1e6, y: 0, z: 1e6 }
 
 function buildYardPlot(scene, lighting, floor) {
   const group = new Group()
-  scene.add(group)
+  const shell = new Group() // what stands here whichever way the yard is drawn
+  scene.add(shell)
   const view = { turned: false }
   const book = createBook()
   const holder = createHolder()
@@ -34,8 +41,16 @@ function buildYardPlot(scene, lighting, floor) {
   const plot = createPlot(yard, { book })
   const name = new Group()
   name.position.set(8, PLOTS.nameY, 10)
-  group.add(name)
-  return { group, view, book, holder, yard, plot, name, shown: '', slot: -1, owner: null, json: null, wait: 0, placed: { x: 0, z: 0, turned: false }, fresh: yard.forest.snapshot(itemCode) }
+  shell.add(name)
+  return { group, shell, view, book, holder, yard, plot, name, shown: '', slot: -1, owner: null, json: null, live: false, baked: null, ownBake: false, bakeIn: 0, range: 0, fastFrame: null, slowFrame: null, placed: { x: 0, z: 0, turned: false }, fresh: yard.forest.snapshot(itemCode) }
+}
+
+// How far `v` stands from the fence of a yard placed `at`.
+function fenceRange({ x: ax, z: az, turned }, v) {
+  const { west, east, north, south } = PLOTS.area
+  const x = turned ? ax - v.x : v.x - ax
+  const z = turned ? az - v.z : v.z - az
+  return Math.hypot(Math.max(west - x, 0, x - east), Math.max(north - z, 0, z - south))
 }
 
 // Where slot `other` stands from slot `me`.
@@ -99,6 +114,8 @@ export function createPlots(scene, lighting, concrete) {
       e.view.turned = at.turned
       e.group.position.set(at.x, 0, at.z)
       e.group.rotation.y = at.turned ? Math.PI : 0
+      e.shell.position.copy(e.group.position)
+      e.shell.rotation.y = e.group.rotation.y
       e.holder.setTranslation({ x: at.x, y: 0, z: at.z }, true)
       e.holder.setRotation(yawQuat(at.turned ? Math.PI : 0), true)
     }
@@ -106,21 +123,42 @@ export function createPlots(scene, lighting, concrete) {
   place(0)
 
   const bySlot = (slot) => entries.find((e) => e.slot === slot)
+  const atlas = createAtlas(COARSE_POINTER ? PLOTS.atlas.phone : PLOTS.atlas.size, COARSE_POINTER ? PLOTS.atlas.cell / 2 : PLOTS.atlas.cell)
+  fontReady.then(atlas.redraw)
+  const byRange = [...entries]
+  let quality = null // the graphics preset
+  let emptyYard = null // the stand-in of a yard with nobody in it: all of them share it
+  let baking = null // { e, job }: the one stand-in being made
+
+  function showBake(e, baked, own) {
+    if (e.baked) {
+      e.shell.remove(e.baked)
+      if (e.ownBake) disposeBake(e.baked)
+    }
+    e.baked = baked
+    e.ownBake = own
+    baked.visible = !e.live
+    e.shell.add(baked)
+  }
 
   // Back to a yard with nobody in it.
   function vacate(e) {
+    if (baking?.e === e) baking = null
     e.owner = null
     e.json = null
+    e.fastFrame = e.slowFrame = null
     e.plot.load({})
     e.plot.setPerks([])
     e.yard.workers.setCount(0)
     e.yard.forest.restore(e.fresh, () => null)
     setName(e, '')
+    if (emptyYard) showBake(e, emptyYard.clone(), false)
   }
 
   function follow(e, p) {
     if (p.plot === e.json) return
     e.json = p.plot
+    e.bakeIn = Math.min(e.bakeIn, PLOTS.bakeSoon)
     let state = null
     try {
       state = JSON.parse(p.plot || '{}')
@@ -141,6 +179,64 @@ export function createPlots(scene, lighting, concrete) {
     items.end(dt)
   }
 
+  // Sets a stopped yard to what its owner last said.
+  function catchUp(e) {
+    if (e.slowFrame) restoreSlow(e.yard, e.slowFrame)
+    e.slowFrame = null
+  }
+
+  function setLive(e, on, dt, elapsed, camera) {
+    e.live = on
+    if (e.baked) e.baked.visible = !on
+    if (!on) {
+      e.shell.parent.remove(e.group)
+      e.bakeIn = PLOTS.bakeSoon // the yard has moved on since the stand-in was taken
+      return
+    }
+    if (baking?.e === e) baking = null
+    catchUp(e)
+    if (e.fastFrame) restoreFast(e.yard, e.fastFrame)
+    e.fastFrame = null
+    step(e, dt, elapsed, camera)
+    e.shell.parent.add(e.group)
+  }
+
+  // What the yard shows now, with empty hands: a crew's load would be left hanging in the air.
+  function startBake(e, dt, elapsed, camera) {
+    catchUp(e)
+    e.yard.workers.clear()
+    step(e, dt, elapsed, camera)
+    return bakeYard(e.group, new Set(e.yard.movers()), atlas)
+  }
+
+  function bakeEmpty(dt, elapsed, camera) {
+    const job = startBake(entries[0], dt, elapsed, camera)
+    emptyYard = job.step(Infinity)
+    for (const e of entries) if (!e.baked) showBake(e, emptyYard.clone(), false)
+  }
+
+  // One stand-in at a time, a little each frame. A yard stays as it was until the new one is done.
+  function bakeNext(dt, elapsed, camera) {
+    if (!baking) {
+      for (const e of entries) {
+        if (!e.owner || e.live) continue
+        e.bakeIn -= dt
+        if (baking || e.bakeIn > 0 || !e.shell.visible) continue
+        e.bakeIn = PLOTS.bakeEvery
+        baking = { e, job: startBake(e, dt, elapsed, camera) }
+      }
+    }
+    if (!baking) return
+    try {
+      const baked = baking.job.step(PLOTS.bakeBudget)
+      if (!baked) return
+      showBake(baking.e, baked, true)
+    } catch (err) {
+      console.warn('[plots] could not bake a yard', err) // a yard changed under it: the next take is fine
+    }
+    baking = null
+  }
+
   const out = {
     get slot() {
       return me
@@ -158,14 +254,23 @@ export function createPlots(scene, lighting, concrete) {
     },
     fast(slot, frame) {
       const e = bySlot(slot)
-      if (e?.owner) restoreFast(e.yard, frame)
+      if (!e?.owner) return
+      if (e.live) restoreFast(e.yard, frame)
+      else e.fastFrame = frame
     },
     slow(slot, frame) {
       const e = bySlot(slot)
-      if (e?.owner) restoreSlow(e.yard, frame)
+      if (!e?.owner) return
+      if (e.live) restoreSlow(e.yard, frame)
+      else e.slowFrame = frame
+    },
+    // The graphics preset: how far off a yard is drawn, and how many may be live.
+    configure(preset) {
+      quality = preset
     },
     // Called each frame with the room's roster (null offline) and where the viewer stands.
     update(dt, elapsed, camera, viewer, roster, mine) {
+      if (!emptyYard) bakeEmpty(dt, elapsed, camera)
       if (mine >= 0 && mine !== me) {
         for (const e of entries) if (e.owner) vacate(e)
         place(mine)
@@ -179,16 +284,28 @@ export function createPlots(scene, lighting, concrete) {
         if (p !== e.owner) {
           if (e.owner) vacate(e)
           e.owner = p
+          e.bakeIn = PLOTS.bakeSoon
         }
-        if (!p) continue
-        setName(e, p.username || 'Player')
-        follow(e, p)
-        e.wait += dt
-        const near = Math.hypot(e.group.position.x - viewer.x, e.group.position.z - viewer.z) < PLOTS.nearRange
-        if (e.wait < (near ? 0 : PLOTS.farStep)) continue
-        step(e, Math.min(e.wait, NET.slowEvery), elapsed, camera)
-        e.wait = 0
+        if (p) {
+          setName(e, p.username || 'Player')
+          follow(e, p)
+        }
+        e.range = fenceRange(e.placed, viewer)
+        e.shell.visible = e.range < quality.view
+        // Past the sun's shadow box a stand-in would only draw itself a second time for nothing.
+        const casts = quality.standInShadows && e.range < LIGHT.shadowRange
+        for (const m of e.baked.children) m.castShadow = casts && !m.material.transparent
       }
+      // The nearest yards in reach are the real thing, and stay so a little way back out.
+      byRange.sort((a, b) => a.range - b.range)
+      let room = quality.liveYards
+      for (const e of byRange) {
+        const want = room > 0 && e.range < (e.live ? PLOTS.liveLeave : PLOTS.liveRange)
+        if (want) room--
+        if (want !== e.live) setLive(e, want, dt, elapsed, camera)
+        if (e.live && e.owner) step(e, dt, elapsed, camera)
+      }
+      bakeNext(dt, elapsed, camera)
     },
   }
   return out

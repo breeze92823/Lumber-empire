@@ -16,12 +16,14 @@ import { setLeaders } from './yard/leaders.js'
 import { rigPortraits } from './yard/rigPortrait.js'
 import { createGame } from './game.js'
 import { createHud } from './hud.js'
+import { createTutorial } from './tutorial.js'
 import { career, upgradeCost } from './stats.js'
-import { initNet, net, onNetMessage, roster, saveNow, sendEmote, sendPose, sendYardFast, sendYardSlow, syncAvatar, syncPlot } from './net.js'
+import { hasServer, initNet, net, onNetMessage, roster, saveNow, sendEmote, sendPose, sendYardFast, sendYardSlow, syncAvatar, syncPlot } from './net.js'
 import { createRemotePlayers } from './remotePlayers.js'
 import { createBubble } from './bubble.js'
-import { installAudio, setAdBreak, setVolume } from './audio/core.js'
+import { installAudio, setAdBreak, setDucked, setEar, setVolume } from './audio/core.js'
 import * as sfx from './audio/sfx.js'
+import { createSoundscape } from './audio/world.js'
 import { installInteract, setInteractEnabled, updateInteract } from './interact.js'
 import { anyWindowOpen, closeTopWindow, createWindows, setWindowReserved } from './windows/index.js'
 import { setParticleDensity, updateParticles } from './particles.js'
@@ -39,6 +41,7 @@ import { playEmote } from './avatar/emotes.js'
 let lighting = null
 let renderer = null
 let postfx = null
+let plots = null
 
 // Settings come from the portal's settings menu (or their defaults offline).
 function applySetting(key, value) {
@@ -49,6 +52,7 @@ function applySetting(key, value) {
     renderer.shadowMap.enabled = next.shadows
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, next.dpr))
     lighting?.setShadows(next)
+    plots?.configure(next)
     postfx?.configure(next)
     setNeonBloom(next.bloom)
     setParticleDensity(next.particles)
@@ -82,6 +86,8 @@ function resize() {
   camera.updateProjectionMatrix()
 }
 window.addEventListener('resize', resize)
+window.addEventListener('orientationchange', resize)
+window.visualViewport?.addEventListener('resize', resize)
 resize()
 
 for (const key of Object.keys(bloxity.settings)) applySetting(key, bloxity.settings[key])
@@ -110,19 +116,27 @@ const windows = createWindows(
 )
 windows.depot.setPortraits(rigPortraits(renderer, scene.environment))
 const game = createGame({ yard, hud })
+const soundscape = createSoundscape(yard)
 game.onFloor = windows.hire.raiseMax
-bloxity.onReservedAreas(setWindowReserved)
+const tutorial = createTutorial({ scene, game, hud, yard, loaded: () => net.hydrated || !hasServer(), onStage: saveNow })
+game.onSold = tutorial.sold
+game.onPiled = tutorial.piled
+bloxity.onReservedAreas((areas) => {
+  setWindowReserved(areas)
+  hud.setReserved(areas)
+})
 
 // --- The world's other five yards and the room ------------------------------
 bloxity.loadingStep('Building the neighbours')
-const plots = createPlots(scene, lighting, concrete)
+plots = createPlots(scene, lighting, concrete)
+plots.configure(graphicsPreset(bloxity.settings.graphics_quality))
 const remotes = createRemotePlayers(scene, plots)
 game.onDraw = remotes.drawHands
 onNetMessage('yardFast', ([slot, frame]) => plots.fast(slot, frame))
 onNetMessage('yardSlow', ([slot, frame]) => plots.slow(slot, frame))
 onNetMessage('leaderboard', (msg) => setLeaders(msg, bloxity.displayName()))
 const save = {
-  snapshot: () => ({ money: hud.money, earned: career.earned, playtime: Math.floor(career.playtime), crates: hud.crates, ...game.snapshot(), ...windows.snapshot() }),
+  snapshot: () => ({ money: hud.money, earned: career.earned, playtime: Math.floor(career.playtime), crates: hud.crates, tutorial: tutorial.stage, ...game.snapshot(), ...windows.snapshot() }),
   hydrate(doc) {
     if (Number.isFinite(doc.money)) hud.setMoney(doc.money)
     if (Number.isFinite(doc.earned)) career.earned = doc.earned
@@ -130,6 +144,7 @@ const save = {
     hud.addCrates((doc.crates ?? 0) - hud.crates, WINDOWS.gifts.crateName)
     game.hydrate(doc)
     windows.hydrate(doc)
+    tutorial.hydrate(doc)
   },
   plot: () => game.plotState(),
 }
@@ -141,6 +156,7 @@ initNet(save)
 // up, and only if it stayed put: otherwise it was dragging the camera.
 installAudio()
 installInteract()
+window.addEventListener('click', (e) => e.target.closest?.('button') && sfx.tap())
 {
   const canvas = renderer.domElement
   const raycaster = new Raycaster()
@@ -289,6 +305,8 @@ onModeChanged((mode) => {
 onKey('KeyV', toggleMode)
 onKey('KeyN', () => lighting.toggleDayNight())
 onKey('KeyR', respawn)
+onKey('Digit1', game.toggleAxe)
+onKey('Numpad1', game.toggleAxe)
 const touchUi = installTouch({ mode: toggleMode, day: () => lighting.toggleDayNight(), respawn })
 game.onNearTree = touchUi.showChop
 
@@ -332,12 +350,16 @@ function frame() {
     carry: game.carrying,
     swing: game.swing,
   })
-  axe.visible = !game.carrying || game.swing > 0
+  axe.visible = game.axeOn && (!game.carrying || game.swing > 0)
 
   updateCamera(camera, dt)
+  setEar(player.position, camera)
   world.update(dt, elapsed)
   game.update(dt, elapsed, camera)
+  tutorial.update(dt, elapsed, camera)
   setInteractEnabled(!anyWindowOpen())
+  setDucked(anyWindowOpen())
+  soundscape.update(dt, player, animator?.phase ?? 0, lighting.isNight())
   updateInteract()
   hud.update(dt)
   // The floating "!" over the Trucks kiosk and the Workers stall: only while the wallet covers something there.
@@ -390,5 +412,5 @@ if (import.meta.env.DEV) {
     resetPlayer({ x, y, z }, facing)
     syncYawToPlayer()
   }
-  window.__game = { player, scene, renderer, camera, postfx, yard, hud, windows, lighting, bodies: bodyCount, toggleMode, teleport, game, plots, remotes, net, saveNow, frame, save }
+  window.__game = { player, scene, renderer, camera, postfx, yard, hud, windows, lighting, bodies: bodyCount, toggleMode, teleport, game, tutorial, soundscape, plots, remotes, net, saveNow, frame, save }
 }

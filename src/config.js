@@ -14,8 +14,8 @@ export const DEV_MONEY = 999_999_999
 // Boxity's trophy button: the same boards as the Leaderboard in the yard (backend PLATFORM_BOARDS
 // reports their scores). The first declaration creates a board and later edits here are ignored.
 export const LEADERBOARDS = [
+  { id: 'earned', label: 'Top Earners', order: 'desc', mode: 'best', format: 'compact', reset: 'none' }, // first: the portal opens on it
   { id: 'rebirths', label: 'Top Rebirths', order: 'desc', mode: 'best', format: 'number', reset: 'none' },
-  { id: 'earned', label: 'Top Earners', order: 'desc', mode: 'best', format: 'compact', reset: 'none' },
   { id: 'playtime', label: 'Top Playtime', order: 'desc', mode: 'best', format: 'time', reset: 'none' },
 ]
 
@@ -33,7 +33,7 @@ export const NET = {
   poseHz: 10,
   remoteLerp: 10,
   predictMax: 0.4,
-  avatarFade: 260, // m: a remote player further off than this isn't drawn
+  avatarFade: 160, // m: a remote player further off than this isn't drawn
   // The live yard (yard/sync.js): the crew every `fastEvery` s, belts, logs and trucks every
   // `slowEvery` s, and the yard's purchases, checked every `plotEvery` s.
   fastEvery: 0.2,
@@ -59,8 +59,14 @@ export const PLOTS = {
     { side: 1, row: 1 },
     { side: -1, row: 1 },
   ],
-  nearRange: 130, // m: inside it a neighbour's yard runs every frame...
-  farStep: 0.1, // ...outside, every this many s
+  // A neighbour's yard is the real thing only next to it; from anywhere else a stand-in (yard/standIn.js).
+  area: { west: -22, east: 37, north: -31, south: 51 }, // the fence's box, in a yard's own coordinates
+  liveRange: 14, // m from that box: closer and the real yard comes in...
+  liveLeave: 22, // ...until the viewer is this far out again
+  bakeBudget: 25000, // vertices a frame a stand-in copies, so taking a new one is never a hitch
+  bakeEvery: 15, // s between a stand-in's retakes, so its piles and trees keep up
+  bakeSoon: 1, // s from a purchase to a retake
+  atlas: { size: 2048, cell: 256, phone: 1024 }, // px: the stand-ins' shared pictures
   nameY: 17, // m: the owner's name over a yard
   nameHeight: 2.6,
 }
@@ -662,6 +668,35 @@ export const GAME = {
   },
 }
 
+// The new player tutorial (tutorial.js, guide.js). `stages` are saved as a count (backend
+// `tutorial`, bounded by TUTORIAL_MAX): equip, load the truck, buy the Debarker, load the pile.
+// A task's `touch` replaces `sub` while the touch controls are on screen, `{n}` is the logs in hand.
+export const TUTORIAL = {
+  stages: 4,
+  carry: 3, // what the hands hold until it ends; after that it's Carry Capacity again
+  logs: 3, // logs to bring to the truck, then to the pile
+  saveWait: 8, // s to wait for the save before a server that won't answer is taken as a new player
+  crossings: [-20.4, -5.1, 10.6, 26.2], // z of the gaps between the machines along GAME.line.x
+  trail: { spacing: 2.4, speed: 3.2, start: 1.6, stop: 1.2, y: 0.14, max: 24, size: 0.95 },
+  beacon: { size: 1, bob: 0.35, bobRate: 3, spin: 2, far: 18, farScale: 2.4 }, // scale grows up to farScale from `far` m out
+  beaconHeight: { tree: 9.8, log: 2.4, ring: 3.2 }, // m to the arrow's tip above the ground; a tree's is times its scale
+  colors: { fill: '#ffd83a', side: '#f2930f', edge: '#3a2300', ghost: '#ffd83a' },
+  edge: { x: 0.92, y: 0.88, rx: 0.43, ry: 0.4, gap: 46 }, // on screen within x, y (of the half screen); else on this ellipse, `gap` px from the sides at least
+  pointEvery: 0.2, // s between finding where a UI arrow's button is
+  doneTime: 6, // s the closing card stays up
+  skip: { key: 'KeyK', label: 'Skip tutorial', keyLabel: 'Skip tutorial (K)', sure: 'Skip? Press again', sureTime: 3 }, // two presses, within sureTime s
+  tasks: {
+    equip: { title: 'Equip your axe', sub: 'Press 1 or click the Axe slot', touch: 'Tap the Axe slot', point: '.hud-slot' },
+    chop: { title: 'Chop down a tree', sub: 'Follow the arrows, then hold left click or F beside the tree', touch: 'Follow the arrows, then hold CHOP beside the tree', point: '.touch-btn.chop', beacon: 'tree' },
+    timber: { title: 'Timber!', sub: 'Here come the logs' },
+    pick: { title: 'Pick up the logs ({n})', sub: 'Walk over them: you can hold 3 for now', beacon: 'log' },
+    truck: { title: 'Load the logs on the truck', sub: 'Walk onto the SELL ring', beacon: 'ring' },
+    debarker: { title: 'Buy the Debarker', sub: 'Stand on the BUY ring and hold E', touch: 'Stand on the BUY ring and hold the prompt', point: '.interact.show', beacon: 'ring' },
+    pile: { title: 'Load the logs on the pile', sub: 'Walk onto the LOGS IN ring', beacon: 'ring' },
+  },
+  done: { title: 'Tutorial complete!', sub: 'You hold 1 log again: buy Carry Capacity on the board' },
+}
+
 // HUD values for the buttons that have no rules yet (the money is real).
 export const HUD = {
   money: 0,
@@ -691,12 +726,55 @@ export const SHOP = {
   ],
 }
 
-// Audio (audio/, restored from the old game): only the board button sounds use it so far.
+// Audio (audio/). Everything is synthesised. Ranges are [m at full level, m where it is silent] from
+// the player: past the second number a sound does not exist, and it falls by the square of the way
+// there, so a machine is gone well before its range sounds like it should be.
 export const AUDIO = {
   volume: 0.8,
   storageKey: 'lumber-empire.sound',
   buses: { ui: 0.8, sfx: 0.9, amb: 0.55, engine: 0.5 }, // per-bus levels before the master
   duck: 0.45, // world level while a menu window is open
+  // Over everything on the way out: the top end taken down, so nothing can get thin or piercing.
+  soft: { shelf: 4200, cut: -9, top: 10000 },
+  air: [420, 5200], // Hz a sound is low-passed to at the far end of its range and right beside it
+  width: 0.7, // how far a sound off to one side pans
+  // One-shots.
+  ranges: { chop: [7, 30], fall: [14, 52], land: [3, 14], horn: [10, 38], air: [5, 22] },
+  // The running sounds (loops.js). `level` beside it, `rate` playback speed from stopped to flat out.
+  // Only the nearest of a kind plays, and a machine only sounds while it has work inside it.
+  voices: {
+    debarker: { level: 0.75, range: [3.5, 13] },
+    sawmill: { level: 0.75, range: [3.5, 13] },
+    kiln: { level: 0.6, range: [3.5, 13] },
+    bundler: { level: 0.65, range: [3, 12] },
+    workshop: { level: 0.65, range: [3, 12] },
+    belt: { level: 0.3, range: [1.5, 7] },
+    diesel: { level: 0.7, range: [7, 30], idle: 0.3, idleRange: [2.5, 9], rate: [0.75, 1.75] },
+    train: { level: 0.8, range: [8, 33], rate: [0.65, 1.2] },
+  },
+  turbo: { rate: 1.14, level: 1.2 }, // the Debarker once it is the Turbo
+  spin: { up: 0.6, down: 1.4, droop: 0.82 }, // s to run up and down, and the pitch it runs down to
+  // The ear stops noticing what it is left beside: `settle` s near a machine eases it to `rest`.
+  settle: 12,
+  rest: 0.5,
+  voiceEvery: 0.066, // s between updates of the loops
+  steps: {
+    // thump Hz, gain, scuff Hz, scuff gain, scuff s, grains of grit and the band they fall in
+    concrete: { thump: 170, gain: 0.34, scuff: 900, scuffGain: 0.05, scuffD: 0.03 },
+    grass: { thump: 120, gain: 0.26, scuff: 1100, scuffGain: 0.07, scuffD: 0.07, grains: 3, grit: 0.03, band: [700, 2200] },
+    needles: { thump: 130, gain: 0.28, scuff: 800, scuffGain: 0.06, scuffD: 0.06, grains: 4, grit: 0.05, band: [500, 1900] },
+    gravel: { thump: 140, gain: 0.3, scuff: 1000, scuffGain: 0.07, scuffD: 0.06, grains: 6, grit: 0.07, band: [600, 2400] },
+    wood: { thump: 150, gain: 0.34, scuff: 700, scuffGain: 0.03, scuffD: 0.025, knock: 190 },
+  },
+  ambience: {
+    wind: 0.2, // the low steady air
+    leaves: 0.2, // pines moving, right beside the forest
+    leavesRange: [4, 30], // m from the trees
+    night: 0.65, // how much of the wind is left at night
+    gust: [5, 13], // s between changes of the wind
+    calls: [22, 55], // s between a bird far off
+  },
+
   maxVoices: 48, // one-shot sounds at once before low-priority ones are skipped
   maxVoicesTouch: 24,
   // Output buffer (s, the AudioContext latencyHint) and how far ahead each one-shot is scheduled, so
@@ -796,7 +874,7 @@ export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // capsule the characte
 
 // --- Look ------------------------------------------------------------------
 export const RENDER = { exposure: 1.0 }
-export const FOG = { near: 55, far: 620 }
+export const FOG = { near: 55 } // far is the graphics preset's `fog`
 // The two lighting moods lighting.js blends between (key N toggles).
 export const TIME_OF_DAY = {
   transition: 2.5, // s to blend day <-> night
@@ -849,11 +927,14 @@ export const MATERIAL_PBR = {
 }
 
 // --- Graphics presets, picked by the Bloxity graphics_quality setting ----------
+// view = m from a neighbour's fence past which its yard isn't drawn, fog = where the fog closes so it
+// is gone by then, liveYards = how many neighbours may be the real thing at once (yard/plots.js),
+// standInShadows = whether their stand-ins cast shadows.
 export const GRAPHICS_PRESETS = {
-  Low: { shadows: false, shadowMap: 512, antialias: false, dpr: 1, bloom: false, particles: 0.35 },
-  Medium: { shadows: true, shadowMap: 1024, antialias: false, dpr: 1.25, bloom: false, particles: 0.6 },
-  High: { shadows: true, shadowMap: 2048, antialias: true, dpr: 2, bloom: true, particles: 1 },
-  Ultra: { shadows: true, shadowMap: 4096, antialias: true, dpr: 2, bloom: true, particles: 1 },
+  Low: { shadows: false, shadowMap: 512, antialias: false, dpr: 1, bloom: false, particles: 0.35, view: 170, fog: 240, liveYards: 1, standInShadows: false },
+  Medium: { shadows: true, shadowMap: 1024, antialias: false, dpr: 1.25, bloom: false, particles: 0.6, view: 230, fog: 340, liveYards: 1, standInShadows: false },
+  High: { shadows: true, shadowMap: 2048, antialias: true, dpr: 2, bloom: true, particles: 1, view: 320, fog: 620, liveYards: 2, standInShadows: true },
+  Ultra: { shadows: true, shadowMap: 4096, antialias: true, dpr: 2, bloom: true, particles: 1, view: 400, fog: 620, liveYards: 3, standInShadows: true },
 }
 
 // Bloom (postfx.js): only HDR-bright pixels (above threshold, linear, before
@@ -869,14 +950,14 @@ export const NEON = { k: 3.5, plainMax: 1.2 }
 // is a full-screen multi-pass blur, so it stays off on phones).
 export const COARSE_POINTER = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
 export const DEFAULT_GRAPHICS = COARSE_POINTER ? 'Medium' : 'High'
-export const MOBILE_GRAPHICS_CAP = { dpr: 1.5, shadowMap: 1024, particles: 0.6 }
+export const MOBILE_GRAPHICS_CAP = { dpr: 1.5, shadowMap: 1024, particles: 0.6, view: 230, fog: 340, liveYards: 1 }
 
 // The preset to render with on this device.
 export function graphicsPreset(name) {
   const p = GRAPHICS_PRESETS[name] ?? GRAPHICS_PRESETS[DEFAULT_GRAPHICS]
   if (!COARSE_POINTER) return p
   const cap = MOBILE_GRAPHICS_CAP
-  return { ...p, dpr: Math.min(p.dpr, cap.dpr), shadowMap: Math.min(p.shadowMap, cap.shadowMap), bloom: false, particles: Math.min(p.particles, cap.particles) }
+  return { ...p, dpr: Math.min(p.dpr, cap.dpr), shadowMap: Math.min(p.shadowMap, cap.shadowMap), bloom: false, particles: Math.min(p.particles, cap.particles), view: Math.min(p.view, cap.view), fog: Math.min(p.fog, cap.fog), liveYards: Math.min(p.liveYards, cap.liveYards), standInShadows: false }
 }
 
 // --- Touch controls (touch.js) --------------------------------------------------
@@ -889,6 +970,8 @@ export const TOUCH = {
 // --- Camera (camera.js) -------------------------------------------------------
 export const CAMERA = {
   fov: 70,
+  portraitWidth: 58, // degrees across a tall screen keeps, by widening the vertical FOV...
+  maxFov: 95, // ...up to this
   near: 0.1,
   far: 1200,
   startPitch: 0.56, // radians above the horizon (the reference's high chase cam)

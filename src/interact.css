@@ -4,11 +4,14 @@
   left: 50%;
   bottom: calc(26% + env(safe-area-inset-bottom));
   transform: translateX(-50%) scale(0.9);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 24px);
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 18px 8px 8px;
-  border-radius: 999px;
+  border-radius: 30px;
   background: rgba(12, 18, 34, 0.72);
   color: #fff;
   opacity: 0;
@@ -43,6 +46,11 @@
   display: grid;
   place-items: center;
 }
+.interact-key span:empty {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
 .interact.held .interact-key span {
   transform: scale(0.9);
 }
@@ -66,7 +74,17 @@
   font-family: Fredoka, 'Arial Black', system-ui, sans-serif;
   font-weight: 700;
   font-size: clamp(15px, 2.2vw, 20px);
-  white-space: nowrap;
   paint-order: stroke fill;
   -webkit-text-stroke: 0.18em #101420;
+}
+/* Above the HUD's bottom row on a tall screen (--hud-bottom, hud.css). */
+@media (orientation: portrait) {
+  .touch-ui .interact {
+    bottom: calc(var(--hud-bottom) + 92px);
+  }
+}
+@media (orientation: portrait) and (max-height: 620px) {
+  .touch-ui .interact {
+    bottom: calc(var(--hud-bottom) + 56px);
+  }
 }

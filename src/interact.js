@@ -36,12 +36,14 @@ export const isInteractShowing = () => showing
 
 let el = null
 let textEl = null
+let keyEl = null
 let ring = null
 function build() {
   el = document.createElement('div')
   el.className = 'interact'
   el.innerHTML = `<div class="interact-key"><svg viewBox="0 0 44 44"><circle class="interact-track" cx="22" cy="22" r="19"/><circle class="interact-ring" cx="22" cy="22" r="19"/></svg><span>E</span></div><div class="interact-text"></div>`
   textEl = el.querySelector('.interact-text')
+  keyEl = el.querySelector('.interact-key span')
   ring = el.querySelector('.interact-ring')
   document.body.appendChild(el)
   const down = (e) => {
@@ -89,7 +91,10 @@ export function updateInteract() {
     ring.style.strokeDashoffset = CIRC
     return
   }
-  textEl.textContent = `Press E to ${label}`
+  // A finger holds the prompt itself: no key to name.
+  const finger = document.body.classList.contains('touch-ui')
+  textEl.textContent = `${finger ? 'Hold' : 'Press E'} to ${label}`
+  keyEl.textContent = finger ? '' : 'E'
   const progress = held ? Math.min(1, (performance.now() - heldSince) / INTERACT.holdMs) : 0
   ring.style.strokeDasharray = CIRC
   ring.style.strokeDashoffset = CIRC * (1 - progress)

@@ -1,5 +1,5 @@
 import { CanvasTexture, Group, SRGBColorSpace, Sprite, SpriteMaterial } from 'three'
-import { airBrake, horn, reverseBeep } from '../audio/sfx.js'
+import { airBrake, horn } from '../audio/sfx.js'
 import { GAME, WINDOWS, YARD } from '../config.js'
 import { neon } from '../propkit.js'
 import { paintSoftDot } from '../textures.js'
@@ -9,7 +9,7 @@ import { createRig, trace, travelTime } from './rig.js'
 import { rigShowpiece, rigTemplate } from './rigModels.js'
 
 // The trucks and the train. Models are built nose-to-+Z with the floor at y = 0.
-const SOUND = { horn, air: airBrake, beep: reverseBeep }
+const SOUND = { horn, air: airBrake }
 const TRAIN_STATES = ['pass', 'in', 'dock', 'out']
 
 function wheel(g, x, z, r, width, hub) {
@@ -207,9 +207,20 @@ function buildTrain(scene, items, trucks) {
   }
 
   const out = {
+    model: train,
     owned: false,
     onLeft: null,
     onDocked: null,
+    speed: 0,
+    get running() {
+      return running
+    },
+    get z() {
+      return train.position.z
+    },
+    get tail() {
+      return train.position.z - length
+    },
     get accepting() {
       return out.owned && state === 'dock' && held.length + incoming < room
     },
@@ -289,6 +300,7 @@ function buildTrain(scene, items, trucks) {
         if ((left <= 0 || held.length >= room) && !incoming) depart(true)
       }
       v = Math.min(v, yieldTo(z, dt))
+      out.speed = v
       train.position.z += v * dt
       for (const { item, at } of held) {
         const s = slot(at)
@@ -336,10 +348,7 @@ function createTrucks(scene, items, lighting, stats, remote) {
     train: null,
     night: false,
     sound(name, x, z) {
-      if (remote) return
-      const you = world.player?.position
-      const near = you ? 1 - Math.hypot(x - you.x, z - you.z) / 70 : 0
-      if (near > 0) SOUND[name](near)
+      if (!remote) SOUND[name](x, z)
     },
   }
 

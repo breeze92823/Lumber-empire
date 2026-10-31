@@ -101,7 +101,7 @@ export function createLighting(scene, renderer, preset) {
   const stars = makeStars()
   scene.add(sky, stars)
 
-  scene.fog = new Fog(D.horizon, FOG.near, FOG.far)
+  scene.fog = new Fog(D.horizon, FOG.near, preset.fog)
 
   // --- Lights ---
   const hemi = new HemisphereLight(D.hemiSky, D.hemiGround, D.hemiIntensity)
@@ -195,6 +195,7 @@ export function createLighting(scene, renderer, preset) {
       target = target === 1 ? 0 : 1
     },
     setShadows(next) {
+      scene.fog.far = next.fog
       sun.castShadow = next.shadows
       if (sun.shadow.mapSize.x !== next.shadowMap) {
         sun.shadow.mapSize.set(next.shadowMap, next.shadowMap)

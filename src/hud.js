@@ -6,17 +6,24 @@ import { career } from './stats.js'
 // The on-screen HUD. Everything is sized in reference-screenshot pixels times --u
 // (set on resize), so the layout holds from phones to desktop. Live: the train timer,
 // the wallet with its gains, the hotbar's crates (fed by windows/), what the player carries,
-// the first-steps hint and short notices. Auto Chop, x2 Money and Rush Hour report to `onPerk` and
+// the first-steps hint and short notices. The Axe slot reports to `onAxe`. Auto Chop, x2 Money and Rush Hour report to `onPerk` and
 // FREE REWARDS to `onRewards` (shop.js); Settings opens Boxity's menu.
 // Boxity draws its own toolbar top-left, so nothing here goes in that corner.
-const REF = { w: 1920, h: 985 }
+const REF = { w: 1920, h: 985, portraitW: 900 }
 const MIN_SCALE = COARSE_POINTER ? 0.46 : 0.36 // on touch, keeps every tile at least 44 px tall
-const moneyText = (n) => `$${n.toLocaleString('en-US')}`
+const RIGHT_WIDTH = 232 // .hud-right's width in design px
+const RIGHT_MARGIN = 16 // px left over beside it
 export const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
-// 2500000 -> "$2.5M", 18965 -> "$19K", 1200 -> "$1.2K", 961 -> "$961".
+// 2500000 -> "$2.5M", 18965 -> "$19K", 1200 -> "$1.2K", 961 -> "$961". 999950 rounds up to "$1M", not "$1000K".
+const MONEY_UNITS = ['', 'K', 'M', 'B', 'T']
 export const shortMoney = (n) => {
-  if (n < 1000) return `$${n}`
-  return n < 1e6 ? `$${+(n / 1000).toFixed(1)}K` : `$${+(n / 1e6).toFixed(1)}M`
+  let value = n
+  let unit = 0
+  while (value >= 999.95 && unit < MONEY_UNITS.length - 1) {
+    value /= 1000
+    unit++
+  }
+  return `$${+value.toFixed(1)}${MONEY_UNITS[unit]}`
 }
 const slot = (item, i) => `<button class="hud-btn hud-slot" type="button"><i>${i + 1}</i>${item}</button>`
 const tile =(cls, icon, text, alert = false) => `
@@ -39,7 +46,7 @@ export function createHud({ onTrain, onHome, onMenu }) {
         ${tile('tile-index', ICONS.book, 'Index')}
       </div>
       <div class="hud-wallet">
-        <div class="hud-money">${moneyText(HUD.money)}<span class="hud-gain"></span></div>
+        <div class="hud-money">${shortMoney(HUD.money)}<span class="hud-gain"></span></div>
         <div class="hud-boost">
           <span>Friend Boost: +0%</span>
         </div>
@@ -82,17 +89,35 @@ export function createHud({ onTrain, onHome, onMenu }) {
     </div>
 
     <div class="hud-fps" hidden></div>
-    <div class="hud-hint" hidden></div>
-    <div class="hud-toast" hidden></div>
+    <div class="hud-notes">
+      <div class="hud-hint" hidden></div>
+      <div class="hud-toast" hidden></div>
+    </div>
     <div class="hud-carry" hidden></div>`
   document.body.appendChild(root)
 
   const timer = root.querySelector('.hud-train b')
+  let reserved = [] // Boxity's rectangles (bloxity.onReservedAreas): the layout keeps out of them
   function resize() {
     const vv = window.visualViewport
     const w = vv?.width ?? window.innerWidth
     const h = vv?.height ?? window.innerHeight
-    root.style.setProperty('--u', `${Math.max(MIN_SCALE, Math.min(w / REF.w, h / REF.h, 1.3))}px`)
+    const portrait = h >= w
+    const toolbar = reserved.find((a) => a.id === 'toolbar')
+    const chat = reserved.find((a) => a.id === 'chat')
+    const u = Math.max(MIN_SCALE, portrait ? Math.min(w / REF.portraitW, 1) : Math.min(w / REF.w, h / REF.h, 1.3))
+    const toolbarBottom = toolbar ? toolbar.top + toolbar.height : 0
+    const chatRight = chat ? chat.left + chat.width : 0
+    const px = {
+      '--u': u,
+      // On a tall screen the right column has only what the chat feed leaves it.
+      '--ur': portrait ? Math.min(u, (w - chatRight - RIGHT_MARGIN) / RIGHT_WIDTH) : u,
+      '--res-top': toolbarBottom,
+      '--res-tool-r': toolbar ? toolbar.left + toolbar.width : 0,
+      '--res-chat-b': chat ? chat.top + chat.height : toolbarBottom,
+      '--res-chat-r': chatRight,
+    }
+    for (const [name, value] of Object.entries(px)) root.style.setProperty(name, `${value}px`)
   }
   window.addEventListener('resize', resize)
   window.visualViewport?.addEventListener('resize', resize)
@@ -110,10 +135,13 @@ export function createHud({ onTrain, onHome, onMenu }) {
   const hotbar = root.querySelector('.hud-hotbar')
   const giftAlert = root.querySelector('.tile-gifts .hud-alert')
   let cash = UNLIMITED_MONEY ? DEV_MONEY : HUD.money
-  walletText.textContent = moneyText(cash)
+  walletText.textContent = shortMoney(cash)
   let crates = 0
   let crateSlot = null
 
+  const axeSlot = hotbar.firstElementChild
+  axeSlot.classList.add('on')
+  axeSlot.addEventListener('click', () => out.onAxe?.())
   root.querySelector('.hud-home').addEventListener('click', () => onHome?.())
   root.querySelector('.tile-settings').addEventListener('click', () => onMenu?.())
   const rewards = root.querySelector('.hud-rewards')
@@ -137,6 +165,14 @@ export function createHud({ onTrain, onHome, onMenu }) {
     root,
     onPerk: null,
     onRewards: null,
+    onAxe: null,
+    setAxe(on) {
+      axeSlot.classList.toggle('on', on)
+    },
+    setReserved(areas) {
+      reserved = areas
+      resize()
+    },
     showRewards(on) {
       rewards.style.display = on ? '' : 'none'
     },
@@ -164,7 +200,7 @@ export function createHud({ onTrain, onHome, onMenu }) {
     addMoney(n) {
       if (UNLIMITED_MONEY) return
       cash += n
-      walletText.textContent = moneyText(cash)
+      walletText.textContent = shortMoney(cash)
     },
     // From a save.
     setMoney(n) {
@@ -179,7 +215,7 @@ export function createHud({ onTrain, onHome, onMenu }) {
       career.earned += n
       gained += n
       gainLeft = 1.4
-      gain.textContent = `+${moneyText(gained)}`
+      gain.textContent = `+${shortMoney(gained)}`
       gain.classList.add('on')
     },
     setHint(text) {

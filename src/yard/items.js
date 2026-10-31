@@ -149,8 +149,9 @@ export function createItems(scene) {
     mesh.count++
   }
 
-  return {
+  const out = {
     add,
+    onLand: null, // (item, where): anything thrown has arrived
     // How high an item stands when its bottom is at floor y.
     rest: (item) => MODELS[item.kind].half,
     // Item i of a pile on a floor at y: laid side by side across x, then layer on layer.
@@ -196,6 +197,7 @@ export function createItems(scene) {
         if (f.t >= 1) {
           flying.splice(i, 1)
           f.land?.(f.item)
+          out.onLand?.(f.item, f.to)
           continue
         }
         const hop = 4 * f.t * (1 - f.t)
@@ -226,4 +228,5 @@ export function createItems(scene) {
       if (n) chipMesh.instanceMatrix.needsUpdate = true
     },
   }
+  return out
 }

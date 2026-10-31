@@ -1,3 +1,4 @@
+import * as sfx from '../audio/sfx.js'
 import { SHOP, WINDOWS } from '../config.js'
 import { clock, shortMoney } from '../hud.js'
 import { ART } from './art.js'
@@ -52,6 +53,7 @@ export function createGifts(hud) {
   const claimAll = win.body.querySelector('.gf-all')
 
   function claim(list) {
+    sfx.gift()
     for (const g of list) {
       claimed.add(g)
       hud.addMoney(g.money ?? 0)

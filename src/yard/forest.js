@@ -263,6 +263,7 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
     barLeft = 0
     untag(t)
     showStump(t, true)
+    out.onFell?.(t)
   }
   function regrow(t, type) {
     setType(t, type)
@@ -275,6 +276,8 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
   const out = {
     crop,
     ground,
+    onHit: null,
+    onFell: null,
     onDown: null,
     // The nearest tree standing within `reach` of a trunk's edge, open or not.
     near(x, z, reach) {
@@ -328,6 +331,7 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
       t.hp -= damage
       t.shake = 1
       items.burst(t.x, 1.4, t.z)
+      out.onHit?.(t)
       barTree = t
       barLeft = 2
       if (t.hp > 0) return false

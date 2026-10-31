@@ -127,7 +127,7 @@ class Remote {
     this.swingLeft = Math.max(0, this.swingLeft - dt)
     const swing = this.swingLeft > 0 ? 1 - this.swingLeft / GAME.swingTime : 0
     const carrying = p.carryCount > 0
-    this.animator?.update(dt, { grounded: Math.abs(this.vy) < 0.5, speed: b.speed, verticalVelocity: this.vy, turn: 0, carry: carrying, swing })
+    if (this.group.visible) this.animator?.update(dt, { grounded: Math.abs(this.vy) < 0.5, speed: b.speed, verticalVelocity: this.vy, turn: 0, carry: carrying, swing })
     this.axe.visible = !carrying || swing > 0
     return true
   }
