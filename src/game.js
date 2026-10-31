@@ -122,7 +122,7 @@ export function createGame({ yard, hud }) {
       return
     }
     if (tree.locked) {
-      complain(`Buy ${sales.get('moreForest').title} to chop here`)
+      complain(`Buy ${sales.get(tree.sale).title} to chop here`)
       return
     }
     swingTree = tree

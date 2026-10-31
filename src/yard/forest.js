@@ -73,6 +73,9 @@ function trunkGeometry() {
   return mergeGeometries(parts.map(strip))
 }
 
+// The land the More Forest strips can reach, whichever have been bought.
+const onLand = (x, z) => x < YARD.forest.parcels.at(-1).east + 1 && z > YARD.fence.points[5][1] - 1 && z < YARD.fence.points[6][1] + 1
+
 // Where every tree goes. Rows follow the reference: staggered, spaced so a
 // worker can reach any trunk, with a clear strip along the concrete.
 function layout() {
@@ -98,7 +101,7 @@ function layout() {
   for (const area of outer) {
     for (let i = 0; i < area.count; i++) {
       const t = { x: area.west + rand() * (area.east - area.west), z: area.north + rand() * (area.south - area.north) }
-      if (t.z >= PLOTS.band.north && t.z <= PLOTS.band.south && !insideAirport(t.x, t.z)) trees.push(t)
+      if (t.z >= PLOTS.band.north && t.z <= PLOTS.band.south && !insideAirport(t.x, t.z) && !onLand(t.x, t.z)) trees.push(t)
     }
   }
   for (const [x, z] of F.fixed) trees.push({ x, z, solid: true })
@@ -106,6 +109,23 @@ function layout() {
   for (const [x, z] of F.big) trees.push({ x, z, solid: true, scale: 1, big: true })
   for (const [x, z] of F.golden) trees.push({ x, z, golden: true, scale: 1 })
   for (const t of trees) t.yaw = rand() * Math.PI * 2
+  // The strips past the fence, last, on a seed of their own: the trees above come out the same.
+  const { land } = F
+  const landRand = mulberry32(F.seed + 3)
+  const signs = YARD.saleSigns.filter((s) => F.parcels.some((p) => p.sale === s.id))
+  F.parcels.forEach((parcel, i) => {
+    const west = i ? F.parcels[i - 1].east : YARD.fence.points[5][0]
+    const gapX = (parcel.east - west) / land.columns
+    for (let c = 0; c < land.columns; c++) {
+      for (let z = land.north + (c % 2) * (land.gapZ / 2); z <= land.south; z += land.gapZ) {
+        const x = west + (c + 0.5) * gapX + (landRand() - 0.5) * land.jitter
+        const tz = z + (landRand() - 0.5) * land.jitter
+        const scale = 0.9 + landRand() * 0.28
+        const yaw = landRand() * Math.PI * 2
+        if (free(x, tz) && signs.every((s) => Math.hypot(x - s.x, tz - s.z) > F.clear)) trees.push({ x, z: tz, solid: true, scale, yaw, parcel })
+      }
+    }
+  })
   return trees
 }
 
@@ -150,6 +170,11 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
   const rainbow = new Color()
   const logTint = { golden: GAME.trees.find((t) => t.id === 'golden').color }
   let spooky = false
+  let bought = null // the furthest strip of land owned
+  let moreLogs = 0 // room on the ground that came with the strips
+
+  // The sale that opens a tree of the crop, if it needs one.
+  const saleFor = (t) => t.parcel?.sale ?? (t.z >= GAME.lockedFrom ? 'moreForest' : null)
 
   // Instance matrices: `lean` radians over toward (fallX, fallZ), `grow` 0..1 of full height.
   function pose(t) {
@@ -198,7 +223,8 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
     t.grow = 1
     if (t.solid) {
       t.baseScale = t.scale
-      t.locked = t.z >= GAME.lockedFrom
+      t.sale = saleFor(t)
+      t.locked = !!t.sale
       t.state = 'up'
       t.shake = 0
       t.claim = null
@@ -388,8 +414,19 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
         if (log) ground.push({ item: log, x: logs[i] / 10, z: logs[i + 1] / 10, yaw: logs[i + 3] / 10, claim: null })
       }
     },
-    openAll() {
+    // How many logs may lie on the ground.
+    get maxLogs() {
+      return GAME.maxGroundLogs + moreLogs
+    },
+    // A sale's trees open: More Forest's, or a strip of land's.
+    open(sale) {
+      const parcel = F.parcels.find((p) => p.sale === sale)
+      if (parcel) {
+        bought = parcel
+        moreLogs += parcel.logs
+      }
       for (const t of crop) {
+        if (t.sale !== sale) continue
         t.locked = false
         paint(t)
       }
@@ -398,8 +435,10 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
     // Rebirth: logs gone, the far trees closed again.
     reset() {
       ground.length = 0
+      bought = null
+      moreLogs = 0
       for (const t of crop) {
-        t.locked = t.z >= GAME.lockedFrom
+        t.locked = !!t.sale
         t.claim = null
         paint(t)
       }
@@ -435,13 +474,13 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
             for (let i = 0; i < (remote ? 0 : t.type.logs); i++) {
               const along = 2 + (i / Math.max(t.type.logs - 1, 1)) * 5 * t.scale
               const item = { kind: 'log', mult: spooky ? GAME.haunt.multiplier : (t.type.mult ?? 1), tint: spooky ? GAME.haunt.log : (logTint[t.type.id] ?? null), rainbow: t.type.id === 'rainbow' && !spooky }
-              const x = clamp(t.x + t.fallX * along + (rand() - 0.5) * 1.6, A.west, A.east)
-              let z = clamp(t.z + t.fallZ * along + (rand() - 0.5) * 1.6, A.north, A.south)
+              const x = clamp(t.x + t.fallX * along + (rand() - 0.5) * 1.6, A.west, bought ? bought.east - 1 : A.east)
+              let z = clamp(t.z + t.fallZ * along + (rand() - 0.5) * 1.6, A.north, t.parcel ? F.land.south + 1 : A.south)
               if (overShaft(x, z, 0.8)) z = AIR.tunnel.z + Math.sign(z - AIR.tunnel.z || 1) * (AIR.tunnel.half + 1)
               const landing = { item, x, z, yaw: rand() * Math.PI * 2, claim: null }
               items.fly(item, { x: t.x + t.fallX * along, y: 1.4, z: t.z + t.fallZ * along }, { x, y: 0.42, z }, 0.4, () => ground.push(landing))
             }
-            while (ground.length > GAME.maxGroundLogs) ground.shift()
+            while (ground.length > out.maxLogs) ground.shift()
             t.state = 'gone'
             t.grow = 0
             t.lean = 0

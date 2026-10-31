@@ -139,7 +139,7 @@ function surfaceAt(p) {
 
 export function createSoundscape(yard) {
   const { air, lines, trucks, train } = yard
-  const { rows } = YARD.forest
+  const { rows, land, parcels } = YARD.forest
   const Amb = AUDIO.ambience
   const voices = {}
   let wind = null
@@ -188,7 +188,7 @@ export function createSoundscape(yard) {
     }
     gust += (gustGoal - gust) * Math.min(1, dt / 2.5)
     const t = A.ctx.currentTime
-    const trees = nearness(clamp(ear.x, rows.west, rows.east), ear.y, clamp(ear.z, rows.north, rows.south), Amb.leavesRange)
+    const trees = nearness(clamp(ear.x, rows.west, parcels.at(-1).east), ear.y, clamp(ear.z, rows.north, land.south), Amb.leavesRange)
     const calm = night ? Amb.night : 1
     // Going down the trench the weather stays up on the lawn.
     under += ((air?.tunnel.depth(ear) ?? 0) - under) * Math.min(1, dt * 3)

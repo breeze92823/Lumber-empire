@@ -1,4 +1,4 @@
-import { BoxGeometry, Color, DoubleSide, ExtrudeGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, Shape, ShapeGeometry } from 'three'
+import { BoxGeometry, Color, DoubleSide, ExtrudeGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Shape, ShapeGeometry } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { YARD } from '../config.js'
 import { solidBox } from '../propkit.js'
@@ -8,6 +8,7 @@ import { box, matte } from './kit.js'
 // and the road. All instanced: a couple of hundred pieces, a handful of draw calls.
 const dummy = new Object3D()
 const unit = new BoxGeometry(1, 1, 1)
+const HIDDEN = new Matrix4().makeScale(0, 0, 0)
 
 function instanced(scene, mat, count, shadow = true) {
   const m = new InstancedMesh(unit, mat, count)
@@ -41,10 +42,9 @@ function buildFence(scene, remote) {
     inside.sort((a, b) => (a.z - b.z) * dir)
     for (const G of inside) pts.push([G.x, G.z - (dir * G.width) / 2, 'end'], [G.x, G.z + (dir * G.width) / 2, 'start'])
   })
-  for (let i = 0; i < pts.length - 1; i++) {
-    if (pts[i][2] === 'end') continue // across the opening
-    const [ax, az] = pts[i]
-    const [bx, bz] = pts[i + 1]
+  // `on(stage)` = whether a run stands with that many strips of forest bought; the rest always do.
+  const moving = []
+  function run(ax, az, bx, bz, on = null) {
     const len = Math.hypot(bx - ax, bz - az)
     const yaw = Math.atan2(-(bz - az), bx - ax)
     const spans = Math.max(1, Math.round(len / F.spacing))
@@ -53,19 +53,61 @@ function buildFence(scene, remote) {
       const t1 = (s + 1) / spans
       const px = ax + (bx - ax) * t0
       const pz = az + (bz - az) * t0
-      posts.push([px, pz, yaw])
+      posts.push([px, pz, yaw, on])
       const span = (len / spans) * 1.02
       const cx = ax + ((bx - ax) * (t0 + t1)) / 2
       const cz = az + ((bz - az) * (t0 + t1)) / 2
-      for (const y of F.rails) rails.push([cx, y, cz, span, yaw])
+      for (const y of F.rails) rails.push([cx, y, cz, span, yaw, on])
     }
-    solidBox(len / 2 + 0.3, F.block / 2, 0.25, (ax + bx) / 2, F.block / 2, (az + bz) / 2, yaw)
+    const wall = solidBox(len / 2 + 0.3, F.block / 2, 0.25, (ax + bx) / 2, F.block / 2, (az + bz) / 2, yaw)
+    if (on) moving.push({ wall, on })
   }
+  const [[east, north], [, south]] = F.points.slice(5)
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (pts[i][2] === 'end') continue // across the opening
+    const [ax, az] = pts[i]
+    const [bx, bz] = pts[i + 1]
+    if (ax !== east || bx !== east) run(ax, az, bx, bz)
+  }
+  // The east side stands at the edge of the land bought, and the north and south sides run out to
+  // it. Corners: each east side starts on its north one, each south side on its east one.
+  const edges = [east, ...YARD.forest.parcels.map((p) => p.east)]
+  edges.forEach((x, stage) => {
+    run(x, north, x, south, (now) => now === stage)
+    if (!stage) return
+    run(edges[stage - 1], north, x, north, (now) => now >= stage)
+    run(x, south, edges[stage - 1], south, (now) => now >= stage)
+  })
   const postMesh = instanced(scene, matte(F.post), posts.length)
-  posts.forEach(([x, z, yaw], i) => set(postMesh, i, x, F.height / 2, z, 0.34, F.height, 0.34, yaw))
   const railMesh = instanced(scene, matte(F.rail), rails.length)
-  rails.forEach(([x, y, z, len, yaw], i) => set(railMesh, i, x, y, z, len, 0.2, 0.1, yaw))
+  const placePost = (i) => set(postMesh, i, posts[i][0], F.height / 2, posts[i][1], 0.34, F.height, 0.34, posts[i][2])
+  const placeRail = (i) => set(railMesh, i, rails[i][0], rails[i][1], rails[i][2], rails[i][3], 0.2, 0.1, rails[i][4])
+  posts.forEach((_, i) => placePost(i))
+  rails.forEach((_, i) => placeRail(i))
+  // Taken with every run in place, or the mesh is culled by where the first stage's fence stands.
+  postMesh.computeBoundingSphere()
+  railMesh.computeBoundingSphere()
   for (const G of F.gates) buildGate(scene, F, G)
+
+  const fence = {
+    setStage(stage) {
+      posts.forEach(([, , , on], i) => {
+        if (!on) return
+        if (on(stage)) placePost(i)
+        else postMesh.setMatrixAt(i, HIDDEN)
+      })
+      rails.forEach((rail, i) => {
+        const on = rail[5]
+        if (!on) return
+        if (on(stage)) placeRail(i)
+        else railMesh.setMatrixAt(i, HIDDEN)
+      })
+      postMesh.instanceMatrix.needsUpdate = railMesh.instanceMatrix.needsUpdate = true
+      for (const { wall, on } of moving) wall.setEnabled(on(stage))
+    },
+  }
+  fence.setStage(0)
+  return fence
 }
 
 // Two gate leaves hinged on tall posts either side of the opening, swung open to the east
@@ -159,10 +201,11 @@ function buildDrives(scene) {
 
 // A neighbour's yard has its own fence and drives but shares the road and rails.
 export function buildPerimeter(scene, remote = false) {
-  buildFence(scene, remote)
+  const fence = buildFence(scene, remote)
   if (!remote) {
     buildRailroad(scene)
     buildRoad(scene)
   }
   buildDrives(scene)
+  return fence
 }

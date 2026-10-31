@@ -380,7 +380,7 @@ export function holdThud(kind, x, y, z) {
   burst({ t, noise: 'brown', type: 'lowpass', f: 190, q: 0.8, d: 0.09, gain: gain, bus })
 }
 
-// The tower on the radio: a squelch, a few syllables through a small speaker, a squelch.
+// The pilot calling on the radio: a squelch, a few syllables through a small speaker, a squelch.
 export function radio(x, z) {
   if (!limit('radio', 800) || !ready()) return
   const bus = placed(x, ear.y, z, R.door, { verb: 0.15 })

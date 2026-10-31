@@ -199,8 +199,8 @@ function buildEffects(scene) {
     intensity: 1.5,
     seed: 7,
   })
-  // Needles coming down in the forest.
-  const r = forest.rows
+  // Needles coming down in the forest, out to the airport's fence.
+  const r = { ...forest.rows, east: forest.parcels.at(-1).east, south: forest.land.south }
   createEmitter(scene, {
     boxes: fx.leaves.colors.map((color) => ({ x: (r.west + r.east) / 2, y: 8.5, z: (r.north + r.south) / 2, sx: (r.east - r.west) / 2 + 2, sy: 1.5, sz: (r.south - r.north) / 2 + 2, color })),
     count: fx.leaves.count,
@@ -233,7 +233,7 @@ function buildEffects(scene) {
 // particles, and a crew of puppets. `view.turned` says the group stands turned half way round.
 export function buildYard(scene, lighting, { book = ownBook, remote = false, view = null } = {}) {
   remoteTextures(remote)
-  buildPerimeter(scene, remote)
+  const fence = buildPerimeter(scene, remote)
   const items = createItems(scene)
   const forest = buildForest(scene, items, book, remote)
   const boards = buildBoards(scene, remote)
@@ -273,6 +273,7 @@ export function buildYard(scene, lighting, { book = ownBook, remote = false, vie
 
   return {
     items,
+    fence,
     forest,
     lines,
     sky,

@@ -7,7 +7,7 @@ const FLOOR_SALE = [null, 'secondFloor', 'thirdFloor'] // what opens each floor
 const UNLOCKS = [[1, 'Rebirth 1'], [2, 'Rebirth 2'], [3, 'Rebirth 3'], [5, 'Rebirth 5']] // the padlocks a rebirth count takes off
 
 export function createPlot(yard, { book, notify = null, setBelts = null, onWipe = null, onFloor = null }) {
-  const { air, boards, feeds, floors, forest, items, lifters, lines, mills, sky, stations, train, trucks } = yard
+  const { air, boards, feeds, fence, floors, forest, items, lifters, lines, mills, sky, stations, train, trucks } = yard
   const owned = new Set()
   const perks = new Set() // the shop's Hacker and OP Truck: they outlive a rebirth
   const buyRings = YARD.rings.filter((r) => r.buy).map((spec) => ({ spec, inside: false }))
@@ -54,7 +54,17 @@ export function createPlot(yard, { book, notify = null, setBelts = null, onWipe 
     conveyor2: (f) => link(f, 1),
     conveyor3: (f) => link(f, 2),
     conveyor4: (f) => link(f, 3),
-    moreForest: () => forest.openAll(),
+    moreForest: () => forest.open('moreForest'),
+    ...Object.fromEntries(
+      YARD.forest.parcels.map((p, i) => [
+        p.sale,
+        () => {
+          forest.open(p.sale)
+          fence.setStage(i + 1)
+          say(p.note)
+        },
+      ]),
+    ),
     truckBay2: () => openBay(1),
     truckBay3: () => openBay(2),
     truckBay4: () => openBay(3),
@@ -196,6 +206,7 @@ export function createPlot(yard, { book, notify = null, setBelts = null, onWipe 
       lifters.reset()
       train.reset()
       forest.reset()
+      fence.setStage(0)
       trucks.reset()
       air?.reset()
       yard.workers.clear()
