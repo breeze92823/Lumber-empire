@@ -218,7 +218,37 @@ function train(n, s) {
   return out
 }
 
-const RECIPES = { debarker: [debarker, 6], sawmill: [sawmill, 8], kiln: [kiln, 8], bundler: [bundler, 5.2], workshop: [workshop, 7], belt: [belt, 4], diesel: [diesel, 2], train: [train, 3.2] }
+// Freighter turboprops: heavy blade passes felt as thumps of air, four engines drifting in and out of
+// step over a deep gas-turbine rumble. world.js speeds it up with the throttle.
+function prop(n, s) {
+  const out = new Float32Array(n)
+  const blades = fit(16, s)
+  const drift = fit(1.34, s)
+  const slow = fit(0.67, s)
+  const chop = bandpass(white(n), 210, 0.8)
+  mix(out, chop, 1.4, (u) => {
+    const a = 0.5 + 0.5 * Math.sin(TAU * blades * s * u)
+    return 0.22 + a * a * a * (0.7 + 0.2 * Math.sin(TAU * drift * s * u) + 0.1 * Math.sin(TAU * slow * s * u))
+  })
+  mix(out, lowpass(white(n), 105), 3)
+  mix(out, bandpass(white(n), 640, 0.9), 0.12)
+  return out
+}
+
+// Four big fans: a broad heavy rush of air over a low core, with the fan's buzz far under it and the
+// top end only there as a breath.
+function jet(n, s) {
+  const out = new Float32Array(n)
+  const swell = wander(n, 9)
+  const buzz = fit(46, s)
+  mix(out, lowpass(white(n), 135), 3.6)
+  mix(out, bandpass(white(n), 380, 0.5), 0.9, (u, i) => 0.7 + 0.3 * swell[i])
+  mix(out, bandpass(white(n), 1100, 0.7), 0.16, (u, i) => 0.5 + 0.5 * swell[n - 1 - i])
+  for (let i = 0; i < n; i++) out[i] += Math.sin((TAU * buzz * i) / RATE) * 0.05
+  return out
+}
+
+const RECIPES = { debarker: [debarker, 6], sawmill: [sawmill, 8], kiln: [kiln, 8], bundler: [bundler, 5.2], workshop: [workshop, 7], belt: [belt, 4], diesel: [diesel, 2], train: [train, 3.2], prop: [prop, 3], jet: [jet, 4] }
 
 export const LOOP_NAMES = Object.keys(RECIPES)
 

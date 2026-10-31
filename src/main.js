@@ -13,7 +13,7 @@ import { buildYard, yardContacts } from './yard/index.js'
 import { createPlots } from './yard/plots.js'
 import { captureFast, captureSlow } from './yard/sync.js'
 import { setLeaders } from './yard/leaders.js'
-import { rigPortraits } from './yard/rigPortrait.js'
+import { planePortraits, rigPortraits } from './yard/rigPortrait.js'
 import { createGame } from './game.js'
 import { createHud } from './hud.js'
 import { createTutorial } from './tutorial.js'
@@ -115,7 +115,16 @@ const windows = createWindows(
   (rebirths, skipped) => game.rebirth(rebirths, skipped),
 )
 windows.depot.setPortraits(rigPortraits(renderer, scene.environment))
+windows.hangar.setPortraits(planePortraits(renderer, scene.environment))
 const game = createGame({ yard, hud })
+windows.airstrip = () => game.plot.owned.has('airstrip')
+windows.belted = () => game.plot.owned.has('airBelt')
+windows.links.setOwned(game.plot.owned)
+windows.buySale = (id) => {
+  const result = game.press({ sale: id })
+  sfx[result]()
+  return result
+}
 const soundscape = createSoundscape(yard)
 game.onFloor = windows.hire.raiseMax
 const tutorial = createTutorial({ scene, game, hud, yard, loaded: () => net.hydrated || !hasServer(), onStage: saveNow })
@@ -399,6 +408,8 @@ function frame() {
   const trucksCost = Math.min(upgradeCost('truckLevel') ?? Infinity, upgradeCost('delivery') ?? Infinity)
   yard.stations.setAlert(0, hud.money >= trucksCost)
   yard.stations.setAlert(1, windows.hire.canHire())
+  const hangarCost = Math.min(upgradeCost('aircraft') ?? Infinity, upgradeCost('flightTime') ?? Infinity)
+  yard.stations.setAlert(2, windows.airstrip() && hud.money >= hangarCost)
   windows.update(dt)
   bubble.update(dt)
   plots.update(dt, elapsed, camera, p, roster(), net.slot)

@@ -1,6 +1,6 @@
 import { BufferAttribute, Color, ConeGeometry, CylinderGeometry, Group, InstancedMesh, Matrix4, MeshStandardMaterial, Object3D, Quaternion, Sprite, SpriteMaterial, Vector3 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { clamp, GAME, PLOTS, YARD } from '../config.js'
+import { AIR, clamp, GAME, insideAirport, overShaft, PLOTS, YARD } from '../config.js'
 import { label, solidPole } from '../propkit.js'
 import { mulberry32 } from '../textures.js'
 import { bake } from '../bake.js'
@@ -82,7 +82,7 @@ function layout() {
   // Trees placed by hand, plus the clearing round the More Forest ring.
   const planted = [...F.fixed, ...F.big]
   const clearings = [...planted, ...YARD.rings.filter((r) => r.x > YARD.concrete.east).map((r) => [r.x, r.z])]
-  const free = (x, z) => clearings.every(([cx, cz]) => Math.hypot(x - cx, z - cz) > F.clear)
+  const free = (x, z) => !overShaft(x, z, AIR.tunnel.keepClear) && clearings.every(([cx, cz]) => Math.hypot(x - cx, z - cz) > F.clear)
 
   const trees = []
   let row = 0
@@ -98,7 +98,7 @@ function layout() {
   for (const area of outer) {
     for (let i = 0; i < area.count; i++) {
       const t = { x: area.west + rand() * (area.east - area.west), z: area.north + rand() * (area.south - area.north) }
-      if (t.z >= PLOTS.band.north && t.z <= PLOTS.band.south) trees.push(t)
+      if (t.z >= PLOTS.band.north && t.z <= PLOTS.band.south && !insideAirport(t.x, t.z)) trees.push(t)
     }
   }
   for (const [x, z] of F.fixed) trees.push({ x, z, solid: true })
@@ -436,7 +436,8 @@ export function buildForest(scene, items, { stats, rollTree }, remote = false) {
               const along = 2 + (i / Math.max(t.type.logs - 1, 1)) * 5 * t.scale
               const item = { kind: 'log', mult: spooky ? GAME.haunt.multiplier : (t.type.mult ?? 1), tint: spooky ? GAME.haunt.log : (logTint[t.type.id] ?? null), rainbow: t.type.id === 'rainbow' && !spooky }
               const x = clamp(t.x + t.fallX * along + (rand() - 0.5) * 1.6, A.west, A.east)
-              const z = clamp(t.z + t.fallZ * along + (rand() - 0.5) * 1.6, A.north, A.south)
+              let z = clamp(t.z + t.fallZ * along + (rand() - 0.5) * 1.6, A.north, A.south)
+              if (overShaft(x, z, 0.8)) z = AIR.tunnel.z + Math.sign(z - AIR.tunnel.z || 1) * (AIR.tunnel.half + 1)
               const landing = { item, x, z, yaw: rand() * Math.PI * 2, claim: null }
               items.fly(item, { x: t.x + t.fallX * along, y: 1.4, z: t.z + t.fallZ * along }, { x, y: 0.42, z }, 0.4, () => ground.push(landing))
             }

@@ -1,4 +1,4 @@
-import { GAME, YARD } from '../config.js'
+import { AIR, GAME, YARD } from '../config.js'
 import { itemCode } from './items.js'
 
 // The production lines, one per floor: runs of belts along GAME.line.path, measured in metres from
@@ -210,6 +210,7 @@ export function createLine(items, sky, floor = 0) {
     turbo: false, // the Debarker Turbo is bought
     lift: null, // the step lifter at the end of its outgoing belt, once bought
     feed: null, // the Bay Conveyer that starts at the end of its outgoing belt, once bought
+    air: null, // the Air Link that starts there, once bought
     inside: null, // the item in the machine
     progress: 0,
     pallet: m.dock,
@@ -278,6 +279,13 @@ export function createLine(items, sky, floor = 0) {
           continue
         }
         const onward = stages[b.stage + 1]
+        const goesOn = m.linked && !!onward?.owned
+        // An Air Link has what the next machine can't keep up with, or everything if the line stops here.
+        if (m.next && m.air?.take(b.item, !goesOn || out.queued(b.stage + 1) >= AIR.trunk.backlog)) {
+          belt.splice(i, 1)
+          i--
+          continue
+        }
         if (m.next && m.linked && onward?.owned) {
           if (m.feed?.take(b.item)) {
             belt.splice(i, 1)
@@ -441,6 +449,7 @@ export function createLine(items, sky, floor = 0) {
         m.turbo = false
         m.lift = null
         m.feed = null
+        m.air = null
         m.sign = L.machines[m.index].sign
         m.inside = null
         m.progress = 0

@@ -1,6 +1,7 @@
 import { COARSE_POINTER, GAME, WINDOWS, YARD } from '../config.js'
 import { createEmitter } from '../particles.js'
 import { book as ownBook } from '../stats.js'
+import { buildAir } from './airstrip.js'
 import { buildBoards } from './boards.js'
 import { buildFeeds } from './feeds.js'
 import { buildForest } from './forest.js'
@@ -15,6 +16,7 @@ import { buildVehicles } from './vehicles.js'
 import { itemFrom } from './items.js'
 import { remoteTextures } from './paint.js'
 import { buildPuppets, buildWorkers } from './workers.js'
+import { buildClosedHatch } from './tunnel.js'
 
 // The player's lumber yard, everything inside the fence plus the railroad and
 // forest around it. buildYard wires the pieces up; each file owns one kind of thing.
@@ -157,7 +159,7 @@ function turboFx(scene, mill) {
 function buildEffects(scene) {
   const { fx, forest, rings, opTruck: P, hacker: H } = YARD
   // Motes rising off the floor rings that stay, in the ring's colour.
-  const lasting = rings.filter((r) => !r.buy && !r.sell && !r.logsIn)
+  const lasting = rings.filter((r) => !r.buy && !r.sell && !r.logsIn && !r.own)
   createEmitter(scene, {
     boxes: lasting.map((r) => ({ x: r.x, y: 0.2, z: r.z, sx: r.r * 0.75, sy: 0.1, sz: r.r * 0.75, color: r.color })),
     count: fx.ring.count * lasting.length,
@@ -243,11 +245,13 @@ export function buildYard(scene, lighting, { book = ownBook, remote = false, vie
   const [line] = lines
   const allMills = lines.map((l) => buildSawmills(scene, l.stages, items, l.base, view))
   const [mills] = allMills
-  const stations = buildStations(scene)
+  const stations = buildStations(scene, remote)
   const floors = buildFloors(scene)
   const lifters = buildLifters(scene, lines, items)
   const feeds = buildFeeds(scene, line, items, trucks, sky)
-  const workers = remote ? buildPuppets(scene, { items, forest }, itemFrom) : buildWorkers(scene, { forest, lines, trucks, train, items }, book.stats)
+  const air = remote ? null : buildAir(scene, { items, lighting, stats: book.stats, trucks, lines })
+  if (remote) buildClosedHatch(scene)
+  const workers = remote ? buildPuppets(scene, { items, forest }, itemFrom) : buildWorkers(scene, { forest, lines, trucks, train, items, air }, book.stats)
   let opPitch = null
   if (!remote) {
     workers.setCount(WINDOWS.hire.workers)
@@ -281,6 +285,7 @@ export function buildYard(scene, lighting, { book = ownBook, remote = false, vie
     lifters,
     feeds,
     workers,
+    air,
     sendTrain: train.send,
     // Bought: the one on show goes, it arrives on the road as the bays' truck.
     soldOpTruck(sold = true) {
@@ -316,6 +321,7 @@ export function buildYard(scene, lighting, { book = ownBook, remote = false, vie
       workers.update(dt, elapsed)
       trucks.update(dt, elapsed, player)
       train.update(dt)
+      air?.update(dt, elapsed, player)
       for (const [on, emitters] of noise) {
         const visible = on()
         for (const e of emitters) e.visible = visible

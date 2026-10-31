@@ -671,6 +671,59 @@
 .w-depot .uiw-title {
   font-size: calc(60 * var(--u));
 }
+.lk-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr;
+  gap: calc(8 * var(--u));
+  align-items: center;
+  padding: calc(16 * var(--u)) calc(16 * var(--u)) calc(6 * var(--u));
+  color: #fff;
+  text-align: center;
+}
+.lk-grid b {
+  font-size: calc(21 * var(--u));
+  -webkit-text-stroke: calc(3 * var(--u)) #000;
+  paint-order: stroke fill;
+}
+.lk-grid em {
+  font-size: calc(26 * var(--u));
+  font-style: normal;
+  text-align: left;
+  -webkit-text-stroke: calc(3 * var(--u)) #000;
+  paint-order: stroke fill;
+}
+.lk-cell {
+  min-height: calc(44 * var(--u));
+  border: calc(3 * var(--u)) solid #000;
+  background: #5b5855;
+  color: #fff;
+  font: inherit;
+  font-size: calc(23 * var(--u));
+  -webkit-text-stroke: calc(3 * var(--u)) #000;
+  paint-order: stroke fill;
+}
+.lk-cell.can {
+  background: linear-gradient(#57e04a, #1fae2c);
+}
+.lk-cell.linked {
+  background: #1b6fb8;
+}
+.lk-cell.locked {
+  background: #34312f;
+  color: #8b8783;
+}
+.dp-air {
+  display: block;
+  margin: calc(8 * var(--u)) auto 0;
+  padding: calc(6 * var(--u)) calc(20 * var(--u));
+  border: calc(3 * var(--u)) solid #000;
+  background: linear-gradient(#57c4f0, #1b7fd0);
+  color: #fff;
+  font: inherit;
+  font-size: calc(24 * var(--u));
+  -webkit-text-stroke: calc(3 * var(--u)) #000;
+  paint-order: stroke fill;
+}
 .w-hire .uiw-body {
   align-items: center;
 }

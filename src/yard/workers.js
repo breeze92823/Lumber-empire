@@ -1,5 +1,5 @@
 import { Group } from 'three'
-import { GAME, YARD } from '../config.js'
+import { AIR, GAME, YARD } from '../config.js'
 import { label } from '../propkit.js'
 import { box, matte } from './kit.js'
 
@@ -138,6 +138,7 @@ export function buildPuppets(scene, { items, forest }, item) {
           w.load = it ? [it] : []
         }
         w.count = w.load.length ? flat[at + 6] : 0
+        w.g.visible = i < n && w.to.y > -0.3 && w.to.x < YARD.fence.points[5][0] // off down the owner's tunnel: nothing to see here
         if (!w.placed) {
           w.placed = true
           w.g.position.set(w.to.x, w.to.y, w.to.z)
@@ -177,8 +178,9 @@ export function buildPuppets(scene, { items, forest }, item) {
   }
 }
 
-export function buildWorkers(scene, { forest, lines, trucks, train, items }, stats) {
+export function buildWorkers(scene, { forest, lines, trucks, train, items, air }, stats) {
   const W = YARD.workers
+  const HOPPER = YARD.rings.find((r) => r.cargo === 'belt')
   const [line] = lines
   const stages = lines.flatMap((l) => l.stages)
   const [debarker] = stages
@@ -188,7 +190,7 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
 
   // Straight there, unless that means crossing the line: then round its north end.
   function routeTo(w, x, z, floor = 0) {
-    const here = Math.round(w.g.position.y / F.y)
+    const here = Math.max(0, Math.round(w.g.position.y / F.y))
     w.path = []
     // Up or down the stairs, floor by floor; [x, z, height], and heights left out stay put.
     for (let f = here; f < floor; f++) for (const [px, pz] of F.route[f]) w.path.push([px, pz, f * F.y + (pz === F.route[f][0][1] ? 0 : F.y)])
@@ -231,7 +233,31 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
   // Logs on their way to the pile in someone else's hands, so it isn't over-filled.
   function logsComing(w) {
     if (!debarker.owned) return 0
-    return crew.reduce((n, o) => (o === w ? n : o.job === 'pick' ? n + stats.workerCarry : o.load[0]?.kind === 'log' ? n + o.load.length : n), 0)
+    return crew.reduce((n, o) => (o === w || isFlier(o) ? n : o.job === 'pick' ? n + stats.workerCarry : o.load[0]?.kind === 'log' ? n + o.load.length : n), 0)
+  }
+
+  // Every crewEvery-th hand works for the planes, for as long as the pile has room for its logs.
+  const isFlier = (w) => !!air?.open && w.index % AIR.crewEvery === 1
+  function airComing(w) {
+    return crew.reduce((n, o) => (o === w || !isFlier(o) ? n : n + Math.max(o.load.length, o.job === 'pick' ? stats.workerCarry : 0)), 0)
+  }
+  const flies = (w) => isFlier(w) && air.room - airComing(w) > 0
+  // Past the fence or under it: the only way back to the yard is the tunnel.
+  const offYard = (w) => w.g.position.x > AIR.tunnel.west + 1 && (w.g.position.x > YARD.fence.points[5][0] || w.g.position.y < -0.2)
+
+  function goAir(w) {
+    w.job = 'air'
+    if (air.belted) {
+      routeTo(w, HOPPER.x + ((w.index % 3) - 1) * 0.4, HOPPER.z + 1.1)
+      return
+    }
+    routeTo(w, AIR.tunnel.west - 1.2, AIR.tunnel.lane)
+    w.path.push(...air.walk(w.index))
+  }
+
+  function goHome(w) {
+    w.job = 'home'
+    w.path = air.home(w.index)
   }
 
   // The next machine a pallet's goods can be carried to, if nothing else takes them there.
@@ -275,7 +301,7 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
       return true
     },
     logs(w) {
-      if (!debarker.workers || line.roomForLogs - logsComing(w) <= 0) return false
+      if (!flies(w) && (!debarker.workers || line.roomForLogs - logsComing(w) <= 0)) return false
       const log = forest.nearestLog(w.g.position.x, w.g.position.z)
       if (!log) return false
       log.claim = w
@@ -299,7 +325,9 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
   }
 
   function think(w) {
+    if (offYard(w)) return goHome(w)
     if (w.next?.owned && w.load.length) return goFeed(w)
+    if (w.load[0]?.kind === 'log' && flies(w)) return goAir(w)
     if (w.load.length) return debarker.owned && w.load[0].kind === 'log' ? goLoad(w) : goSell(w)
     const hauler = w.index % C.haulEvery === C.haulEvery - 1 || piledUp()
     const order = hauler ? ['haul', 'logs', 'fell'] : ['logs', 'fell', 'haul']
@@ -387,6 +415,21 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
       w.next = carryOn(s)
       w.job = null
     },
+    // At the CARGO ring (the hopper) or, before the Tunnel Conveyor, at the pile.
+    air(w, dt) {
+      rest(w)
+      w.beat -= dt
+      if (w.beat > 0) return
+      w.beat = C.tipEvery
+      const item = w.load[w.load.length - 1]
+      const from = { x: w.g.position.x, y: w.g.position.y + 1.3, z: w.g.position.z }
+      if (!(w.g.position.x < AIR.tunnel.west ? air.tipBelt(item) : air.tipPile(item, from))) return
+      w.load.pop()
+      if (!w.load.length) w.job = null
+    },
+    home(w) {
+      w.job = null
+    },
     feed(w, dt) {
       rest(w)
       w.beat -= dt
@@ -454,6 +497,7 @@ export function buildWorkers(scene, { forest, lines, trucks, train, items }, sta
         w.load.length = 0
         w.path = []
         w.g.position.y = 0 // the floors have gone from under them
+        if (offYard(w)) w.g.position.set(W.spawn[0] + w.index * 1.6, 0, W.spawn[1]) // so has the tunnel
         w.job = w.tree = w.log = w.stage = w.next = w.truck = null
       }
     },

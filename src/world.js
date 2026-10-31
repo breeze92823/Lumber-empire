@@ -1,5 +1,5 @@
 import { Group, IcosahedronGeometry, Mesh, MeshLambertMaterial, MeshStandardMaterial, PlaneGeometry } from 'three'
-import { YARD } from './config.js'
+import { AIR, YARD } from './config.js'
 import { RAPIER, addFixed } from './physics.js'
 import { mulberry32, toTexture } from './textures.js'
 import { paintConcrete, paintTurf } from './yard/paint.js'
@@ -75,17 +75,60 @@ export function buildGround(root, contacts) {
   strip(root, turf, C.west, C.east, -FAR, C.north, grass.tile)
   strip(root, concrete, C.west, C.east, C.north, C.south)
   strip(root, turf, C.west, C.east, C.south, FAR, grass.tile)
-  strip(root, turf, C.east, FAR, -FAR, FAR, grass.tile)
+  // East of the concrete, round the two trenches down to the tunnel.
+  const T = AIR.tunnel
+  const [north, south] = [T.z - T.half, T.z + T.half]
+  strip(root, turf, C.east, T.west, -FAR, FAR, grass.tile)
+  strip(root, turf, T.west, T.portal, -FAR, north, grass.tile)
+  strip(root, turf, T.west, T.portal, south, FAR, grass.tile)
+  strip(root, turf, T.portal, T.east, -FAR, FAR, grass.tile)
+  strip(root, turf, T.east, T.top, -FAR, north, grass.tile)
+  strip(root, turf, T.east, T.top, south, FAR, grass.tile)
+  // Past that, round the apron and the runway, which are ground like any other.
+  const { apron: P, runway: R } = AIR
+  const [strip0, strip1] = [R.z - R.half, R.z + R.half]
+  strip(root, new MeshStandardMaterial({ color: P.color, roughness: 0.95 }), P.west, P.east, P.north, strip0)
+  strip(root, new MeshStandardMaterial({ color: R.color, roughness: 0.92 }), R.west, R.east, strip0, strip1)
+  strip(root, turf, T.top, FAR, -FAR, P.north, grass.tile)
+  strip(root, turf, T.top, FAR, strip1, FAR, grass.tile)
+  strip(root, turf, P.east, FAR, P.north, strip0, grass.tile)
+  strip(root, turf, T.top, R.west, strip0, strip1, grass.tile)
+  strip(root, turf, R.east, FAR, strip0, strip1, grass.tile)
   return concrete
+}
+
+function floor(west, east, north, south) {
+  addFixed(RAPIER.ColliderDesc.cuboid((east - west) / 2, FLOOR_THICKNESS / 2, (south - north) / 2), { x: (west + east) / 2, y: -FLOOR_THICKNESS / 2, z: (north + south) / 2 }, null, { friction: 0.9 })
+}
+
+// The airport runs for hundreds of metres, so its floor is laid in lengths.
+function lengths(west, east, north, south) {
+  const n = Math.ceil((east - west) / AIR.compound.tile)
+  const each = (east - west) / n
+  for (let i = 0; i < n; i++) floor(west + i * each, west + (i + 1) * each, north, south)
 }
 
 // One floor under the yard; the fence's walls keep the player on it (perimeter.js). Only as
 // big as it has to be: on a cuboid hundreds of metres wide the character sinks through
-// the contact a little more the further it gets from the middle.
-export function landColliders() {
+// the contact a little more the further it gets from the middle. The player's own has the trench
+// cut out of it and the airstrip's ground beside it; a neighbour's is solid, its hatch stays shut.
+export function landColliders(remote = false) {
   const { concrete: C } = YARD
   const reach = Math.max(-C.west, C.east, -C.north, C.south) + FLOOR_MARGIN
-  addFixed(RAPIER.ColliderDesc.cuboid(reach, FLOOR_THICKNESS / 2, reach), { x: 0, y: -FLOOR_THICKNESS / 2, z: 0 }, null, { friction: 0.9 })
+  if (remote) {
+    floor(-reach, reach, -reach, reach)
+    return
+  }
+  const T = AIR.tunnel
+  const { compound: G } = AIR
+  const [north, south] = [T.z - T.half, T.z + T.half]
+  floor(-reach, T.west, -reach, reach)
+  floor(T.west, T.portal, -reach, north)
+  floor(T.west, T.portal, south, reach)
+  floor(T.portal, reach, -reach, reach)
+  lengths(reach, G.east, G.north, north)
+  lengths(reach, G.east, south, G.south)
+  lengths(T.top, G.east, north, south)
 }
 
 export function createWorld(scene) {

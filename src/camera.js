@@ -29,6 +29,19 @@ let zoomEased = CAMERA.distance
 let rush = 0 // eased 0..1 sprint factor
 let clearance = 1 // 0..1 of the boom the walls allow, eased back out
 
+let shaken = 0 // m the view is thrown about by, dying away
+// Something big just happened near by.
+export function shake(amount) {
+  shaken = Math.max(shaken, amount)
+}
+function applyShake(camera, dt) {
+  if (shaken < 0.002) return
+  camera.position.x += (Math.random() - 0.5) * shaken
+  camera.position.y += (Math.random() - 0.5) * shaken
+  camera.position.z += (Math.random() - 0.5) * shaken
+  shaken *= Math.exp(-CAMERA.shakeFade * dt)
+}
+
 export const getYaw = () => state.yaw
 export const getPitch = () => state.pitch
 
@@ -123,6 +136,7 @@ export function update(camera, dt) {
     const cp = Math.cos(state.pitch)
     camera.position.set(followed.x, eyeY, followed.z)
     camera.lookAt(followed.x - Math.sin(state.yaw) * cp, eyeY - Math.sin(state.pitch), followed.z - Math.cos(state.yaw) * cp)
+    applyShake(camera, dt)
     return
   }
 
@@ -146,4 +160,5 @@ export function update(camera, dt) {
 
   camera.position.set(look.x + (px - look.x) * clearance, look.y + (py - look.y) * clearance, look.z + (pz - look.z) * clearance)
   camera.lookAt(look.x, look.y, look.z)
+  applyShake(camera, dt)
 }

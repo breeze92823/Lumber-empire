@@ -3,7 +3,7 @@
 // and low, so a sound repeated all session stays pleasant.
 import { AUDIO, COARSE_POINTER, GAME } from '../config.js'
 import { A, ear, isMuted, now, onStart, ready, voice } from './core.js'
-import { burst, crinkle, modal, placed, rnd, tone, vary } from './synth.js'
+import { bubble, burst, crinkle, modal, placed, rnd, tone, vary } from './synth.js'
 
 const R = AUDIO.ranges
 const COIN = [[1, 1, 0.5], [1.504, 0.6, 0.36], [2.24, 0.45, 0.26], [2.71, 0.3, 0.18], [3.47, 0.22, 0.12], [4.03, 0.12, 0.08]]
@@ -223,13 +223,13 @@ export function land(kind, x, y, z) {
 }
 
 // A foot coming down: `on` is a key of AUDIO.steps, `weight` 1 for a stride, more for a landing.
-export function step(on, weight = 1) {
+export function step(on, weight = 1, verb = 0) {
   if (!ready() || !voice(0.14, 1)) return
   const S = AUDIO.steps[on]
   const g = weight * rnd(0.82, 1.05)
   const t = now()
-  burst({ t, noise: 'brown', type: 'lowpass', f: vary(S.thump, 0.1), q: 0.7, a: 0.003, d: 0.07 + weight * 0.02, gain: S.gain * g })
-  burst({ t: t + 0.006, noise: 'pink', f: vary(S.scuff, 0.2), q: 0.9, a: 0.004, d: S.scuffD, gain: S.scuffGain * g, pan: rnd(-0.08, 0.08) })
+  burst({ t, noise: 'brown', type: 'lowpass', f: vary(S.thump, 0.1), q: 0.7, a: 0.003, d: 0.07 + weight * 0.02, gain: S.gain * g, verb })
+  burst({ t: t + 0.006, noise: 'pink', f: vary(S.scuff, 0.2), q: 0.9, a: 0.004, d: S.scuffD, gain: S.scuffGain * g, pan: rnd(-0.08, 0.08), verb })
   if (S.grains) crinkle({ t, n: S.grains, dur: 0.07, gain: S.grit * g, f0: S.band[0], f1: S.band[1], width: 0.15 })
   if (S.knock) modal({ t, f: vary(S.knock, 0.08), modes: WOOD, gain: 0.1 * g })
 }
@@ -252,6 +252,165 @@ export function horn(x, z) {
     tone({ t, type: 'sawtooth', f, a: 0.05, hold: 0.26, d: 0.18, gain: 0.06, lp: 760, bus })
     tone({ t, type: 'sawtooth', f: f * 1.006, a: 0.05, hold: 0.26, d: 0.18, gain: 0.05, lp: 760, bus })
   }
+}
+
+// The hatch going: a deep charge in the rock, the air coming back, timber raining down after it.
+export function blast(x, z) {
+  if (!ready()) return
+  const bus = placed(x, ear.y, z, R.blast, { verb: 0.45 })
+  if (!bus || !voice(2.2, 3)) return
+  const t = now()
+  tone({ t, f: 62, f2: 26, d: 0.9, gain: 0.8, bus })
+  burst({ t, noise: 'brown', type: 'lowpass', f: 420, f2: 90, q: 0.7, a: 0.004, d: 1.3, gain: 1, bus })
+  burst({ t, noise: 'pink', f: 1500, f2: 300, q: 0.5, a: 0.002, d: 0.32, gain: 0.5, bus })
+  burst({ t: t + 0.25, noise: 'brown', type: 'lowpass', f: 180, q: 0.6, a: 0.2, d: 1.1, gain: 0.5, bus })
+  for (let i = 0; i < 12; i++) modal({ t: t + rnd(0.35, 1.5), f: rnd(170, 520), modes: WOOD, gain: rnd(0.08, 0.3), decay: rnd(0.8, 1.4), bus })
+  buzz([60, 30, 90])
+}
+
+// Power coming on across a whole airfield: a contactor's clunk and a slow transformer breath.
+export function powerUp(x, z) {
+  if (!ready()) return
+  const bus = placed(x, ear.y, z, R.touch, { verb: 0.3 })
+  if (!bus || !voice(1.6, 2)) return
+  const t = now()
+  for (let i = 0; i < 4; i++) {
+    const at = t + i * 0.16
+    modal({ t: at, f: vary(150 + i * 26, 0.05), modes: PLASTIC, gain: 0.3, strike: 0.1, bus })
+    tone({ t: at, f: 90, f2: 52, d: 0.08, gain: 0.3, bus })
+  }
+  burst({ t: t + 0.2, noise: 'brown', type: 'lowpass', f: 160, f2: 340, q: 0.8, a: 0.5, d: 0.8, gain: 0.5, bus })
+}
+
+// A heavy steel plate struck: the ramp, the bunker, a hold's floor. `f` its lowest note.
+const STEEL = [[1, 1, 0.34], [1.73, 0.5, 0.2], [2.81, 0.3, 0.12], [4.17, 0.14, 0.07]]
+
+// The ramp on its rams: hydraulics straining, heavier the bigger the plane. `size` 0..1.
+export function ramp(x, z, open, size = 0) {
+  if (!limit('ramp', 300) || !ready()) return
+  const bus = placed(x, ear.y, z, R.door)
+  if (!bus || !voice(1.2, 1)) return
+  const t = now()
+  const f = 620 - size * 240
+  burst({ t, noise: 'pink', f: open ? f * 1.2 : f, f2: open ? f : f * 1.3, q: 1.4, a: 0.1, hold: 0.45, d: 0.25, gain: 0.3, bus })
+  burst({ t, noise: 'brown', type: 'lowpass', f: 200 - size * 70, q: 0.8, a: 0.08, hold: 0.45, d: 0.25, gain: 0.42 + size * 0.2, bus })
+  modal({ t, f: vary(90 - size * 26, 0.04), modes: STEEL, gain: 0.2, strike: 0.08, bus })
+}
+
+// The ramp arriving: down, its toes clang on the concrete and scrape; up, it locks with a hard thud.
+export function rampHome(x, z, open, size = 0) {
+  if (!ready()) return
+  const bus = placed(x, ear.y, z, R.door, { verb: 0.12 })
+  if (!bus || !voice(0.9, 2)) return
+  const t = now()
+  const f = vary(138 - size * 54, 0.05)
+  modal({ t, f, modes: STEEL, gain: 0.6, strike: 0.2, bus })
+  tone({ t, f: 74 - size * 18, f2: 40, d: 0.2, gain: 0.5, bus })
+  if (open) burst({ t: t + 0.03, noise: 'pink', f: 1500, f2: 500, q: 1, a: 0.01, d: 0.26, gain: 0.2, bus })
+  else for (const at of [0.09, 0.16]) modal({ t: t + at, f: f * 2.6, modes: STEEL, gain: 0.2, strike: 0.1, bus })
+}
+
+// The undercarriage locking home.
+export function gear(x, z) {
+  if (!limit('gear', 400) || !ready()) return
+  const bus = placed(x, ear.y, z, R.touch)
+  if (!bus || !voice(0.6, 1)) return
+  const t = now()
+  burst({ t, noise: 'brown', type: 'lowpass', f: 300, q: 0.8, a: 0.08, d: 0.26, gain: 0.3, bus })
+  modal({ t: t + 0.26, f: vary(120, 0.05), modes: STEEL, gain: 0.4, strike: 0.08, bus })
+}
+
+// Rubber meeting the runway: a chirp a bogie, the weight coming down after, and the bigger the plane
+// the more of both.
+export function touchdown(x, z, size = 0) {
+  if (!ready()) return
+  const bus = placed(x, ear.y, z, R.touch, { verb: 0.22 })
+  if (!bus || !voice(1.2, 2)) return
+  const t = now()
+  const chirps = 2 + Math.round(size * 2)
+  for (let i = 0; i < chirps; i++) {
+    const g = 0.32 - i * 0.04
+    burst({ t: t + i * 0.13, noise: 'white', f: 1500, f2: 620, q: 1.8, a: 0.004, d: 0.22, gain: g, bus })
+    burst({ t: t + i * 0.13, noise: 'pink', f: 720, f2: 330, q: 0.8, a: 0.004, d: 0.3, gain: g, bus })
+  }
+  tone({ t: t + 0.02, f: 74 - size * 24, f2: 34, d: 0.4 + size * 0.3, gain: 0.6 + size * 0.2, bus })
+  burst({ t: t + 0.02, noise: 'brown', type: 'lowpass', f: 240, q: 0.7, a: 0.01, d: 0.5 + size * 0.5, gain: 0.7 + size * 0.2, bus })
+}
+
+// Lined up, brakes on, throttles forward: the engines winding up, a jet's with a rising rush.
+export function spool(x, z, jet, size = 0) {
+  if (!ready()) return
+  const bus = placed(x, ear.y, z, R.touch, { verb: 0.15 })
+  if (!bus || !voice(1.6, 1)) return
+  const t = now()
+  burst({ t, noise: 'pink', f: jet ? 340 : 260, f2: jet ? 1300 : 720, q: 0.7, a: 0.9, d: 0.5, gain: 0.26 + size * 0.14, bus })
+  burst({ t, noise: 'brown', type: 'lowpass', f: 150, f2: 340, q: 0.7, a: 0.9, d: 0.5, gain: 0.5 + size * 0.2, bus })
+}
+
+// The reversers thrown over on the roll-out: a great tearing of air, gone in a few seconds.
+export function reverse(x, z, jet, size = 0) {
+  if (!ready()) return
+  const bus = placed(x, ear.y, z, R.touch, { verb: 0.2 })
+  if (!bus || !voice(2.8, 1)) return
+  const t = now()
+  burst({ t, noise: 'brown', type: 'lowpass', f: jet ? 420 : 300, f2: 170, q: 0.6, a: 0.35, hold: 0.9, d: 1.2, gain: 0.7 + size * 0.3, bus })
+  burst({ t, noise: 'pink', f: jet ? 1100 : 700, f2: 380, q: 0.6, a: 0.3, hold: 0.8, d: 1, gain: 0.2, bus })
+}
+
+// A diverter arm slamming an item off the belt: an air ram and a knock on the rail.
+export function kicker(x, y, z) {
+  if (!limit('kicker', 90) || !ready()) return
+  const bus = placed(x, y, z, R.kick)
+  if (!bus || !voice(0.3, 1)) return
+  const t = now()
+  burst({ t, noise: 'pink', f: 1100, f2: 500, q: 0.9, a: 0.004, d: 0.1, gain: 0.3, bus })
+  modal({ t: t + 0.03, f: vary(260, 0.08), modes: STEEL, gain: 0.3, strike: 0.1, decay: 0.4, bus })
+}
+
+// Something landing in a steel bunker or on a hold's floor: the same knock as anywhere, in a big
+// metal box. An empty hold booms.
+export function holdThud(kind, x, y, z) {
+  if (!limit('holdThud', 60) || !ready()) return
+  const bus = placed(x, y, z, R.hold, { verb: 0.22 })
+  if (!bus || !voice(0.3, 1)) return
+  const [f, gain] = LAND[kind] ?? LAND.plank
+  const t = now()
+  modal({ t, f: vary(f, 0.1), modes: WOOD, gain: gain * 0.9, strike: 0.05, bus })
+  modal({ t, f: vary(74, 0.1), modes: STEEL, gain: 0.3, decay: 0.8, bus })
+  burst({ t, noise: 'brown', type: 'lowpass', f: 190, q: 0.8, d: 0.09, gain: gain, bus })
+}
+
+// The tower on the radio: a squelch, a few syllables through a small speaker, a squelch.
+export function radio(x, z) {
+  if (!limit('radio', 800) || !ready()) return
+  const bus = placed(x, ear.y, z, R.door, { verb: 0.15 })
+  if (!bus || !voice(1.2, 1)) return
+  const t = now()
+  burst({ t, noise: 'white', f: 1500, q: 1, d: 0.05, gain: 0.5, bus })
+  for (let i = 0, at = t + 0.09; i < 6; i++) {
+    const d = rnd(0.07, 0.15)
+    tone({ t: at, type: 'square', f: rnd(150, 230), a: 0.01, d, gain: 0.05, lp: 1500, bus })
+    burst({ t: at, noise: 'white', f: rnd(800, 1500), q: 1, a: 0.01, d, gain: 0.5, bus })
+    at += d + rnd(0.02, 0.09)
+  }
+  burst({ t: t + 0.9, noise: 'white', f: 1500, q: 1, d: 0.05, gain: 0.45, bus })
+}
+
+// Wheels up and paid: a run of coins going down a chute, with a soft bell over them.
+export const cashOut = onPress(() => {
+  if (!limit('cashOut', 400) || !voice(1.1, 2)) return
+  const t = now()
+  modal({ t, f: 880, modes: REGISTER_BELL, gain: 0.14, beat: 4, strike: 0.04, verb: 0.2, top: COIN_TOP + 800, bus: A.sfx })
+  const n = COARSE_POINTER ? 6 : 10
+  for (let i = 0; i < n; i++) modal({ t: t + 0.05 + i * 0.05 + rnd(0, 0.02), f: rnd(1100, 1800), modes: COIN, gain: 0.06, beat: 7, decay: 0.6, pan: rnd(-0.3, 0.3), bus: A.sfx, verb: 0.08, top: COIN_TOP })
+  buzz([20, 30, 20])
+})
+
+// A drop falling off the tunnel's roof into a puddle a long way down it. `away` 0 near .. 1 far.
+export function drip(pan, away) {
+  if (!ready() || !voice(0.5, 1)) return
+  const f = rnd(520, 1250)
+  bubble({ t: now(), f, d: 0.07, gain: 0.5 * (1 - away * 0.6), rise: 0.6, pan, verb: 0.8, bus: A.amb })
 }
 
 // Air brakes letting go as it stops: a breath, not a hiss.

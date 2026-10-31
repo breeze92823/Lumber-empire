@@ -134,9 +134,10 @@ function buildHackerDesk() {
   return g
 }
 
-function buildRings(scene) {
+function buildRings(scene, remote) {
   const rotors = []
   for (const R of YARD.rings) {
+    if (remote && R.own) continue
     const y = R.y ?? 0
     const base = flatDecal(paintRingBase(R.color, R.text, R.dark), R.r, R.x, y + 0.03, R.z)
     base.rotation.y = R.yaw
@@ -154,7 +155,7 @@ function iconSprite(map, height, aspect = 1) {
   return s
 }
 
-export function buildStations(scene) {
+export function buildStations(scene, remote = false) {
   const { stall: S, kiosk: K, hacker: H, opTruck: P, locked } = YARD
 
   place(scene, buildStall(), S.x, S.z)
@@ -185,6 +186,7 @@ export function buildStations(scene) {
   const lockMap = paintLock()
   const locks = new Map()
   for (const L of locked) {
+    if (remote && L.own) continue
     const lock = iconSprite(lockMap, L.lock, 256 / 320)
     lock.position.set(L.x, L.lockY, L.z)
     const need = label(L.label, L.text, { color: '#f3ead2', outline: '#16130c', outlineWidth: 18 })
@@ -202,7 +204,7 @@ export function buildStations(scene) {
     return { sprite: s, y: a.y }
   })
 
-  const rotors = buildRings(scene)
+  const rotors = buildRings(scene, remote)
   return {
     // The Hacker or OP Truck was bought (`id`, its ring's `perk`): its ring and price go.
     sold(id, on = true) {
@@ -225,7 +227,7 @@ export function buildStations(scene) {
     // Turns the ring for `spec` (an entry of YARD.rings) on or off.
     showRing(spec, on) {
       const ring = rotors.find((r) => r.spec === spec)
-      ring.base.visible = ring.rotor.visible = on
+      if (ring) ring.base.visible = ring.rotor.visible = on
     },
     update(dt, elapsed) {
       for (const { rotor, r, phase } of rotors) {

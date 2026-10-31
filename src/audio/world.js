@@ -3,7 +3,7 @@
 // Each kind of machine is one loop, however many floors have one: it follows the nearest that is
 // working, so the cost is fixed and a stack of floors isn't any louder than one. A loop that has
 // gone quiet stops altogether.
-import { AUDIO, GAME, YARD } from '../config.js'
+import { AIR, AUDIO, GAME, YARD } from '../config.js'
 import { A, ear, muffle, nearness, onStart, panTo, ready } from './core.js'
 import { LOOP_NAMES, RATE, renderLoop } from './loops.js'
 import { rnd } from './synth.js'
@@ -128,6 +128,8 @@ function nearestOnPath(path, px, pz, out) {
 function surfaceAt(p) {
   const { concrete: C, rail, road } = YARD
   if (p.y > 1) return 'wood'
+  if (p.y < -0.5) return 'gravel'
+  if (p.x > AIR.apron.west) return 'concrete'
   if (p.x > C.east) return 'needles'
   if (p.x >= C.west && p.z >= C.north && p.z <= C.south) return 'concrete'
   if (Math.abs(p.x - rail.x) < rail.bedWidth / 2) return 'gravel'
@@ -136,12 +138,15 @@ function surfaceAt(p) {
 }
 
 export function createSoundscape(yard) {
-  const { lines, trucks, train } = yard
+  const { air, lines, trucks, train } = yard
   const { rows } = YARD.forest
   const Amb = AUDIO.ambience
   const voices = {}
   let wind = null
   let leaves = null
+  let rock = null // the tunnel's hum
+  let under = 0 // 0 in the open .. 1 down in the tunnel, eased
+  let dripLeft = 0
   let gust = 0.5
   let gustGoal = 0.5
   let gustLeft = 0
@@ -157,12 +162,13 @@ export function createSoundscape(yard) {
     for (const name of LOOP_NAMES) voices[name] = createVoice(name)
     wind = bed(A.noise.pinkStereo, 'lowpass', 420, 0.5)
     leaves = bed(A.noise.pinkStereo, 'bandpass', 1050, 0.5)
+    rock = bed(A.noise.brownStereo, 'lowpass', 130, 0.7)
   })
 
   function updateFeet(you, phase) {
     const speed = Math.hypot(you.velocity.x, you.velocity.z)
     const beat = Math.floor((phase + FOOTFALL) / Math.PI)
-    if (beat !== lastBeat && you.grounded && speed > 1.5) sfx.step(surfaceAt(you.position))
+    if (beat !== lastBeat && you.grounded && speed > 1.5) sfx.step(surfaceAt(you.position), 1, under * Amb.echo)
     lastBeat = beat
     if (!you.grounded) {
       wasAir = true
@@ -184,11 +190,23 @@ export function createSoundscape(yard) {
     const t = A.ctx.currentTime
     const trees = nearness(clamp(ear.x, rows.west, rows.east), ear.y, clamp(ear.z, rows.north, rows.south), Amb.leavesRange)
     const calm = night ? Amb.night : 1
-    wind.gain.setTargetAtTime(Amb.wind * calm * (0.65 + 0.7 * gust), t, 0.4)
-    leaves.gain.setTargetAtTime(Amb.leaves * calm * (0.12 + 0.88 * trees) * (0.25 + 0.95 * gust * gust), t, 0.4)
+    // Going down the trench the weather stays up on the lawn.
+    under += ((air?.tunnel.depth(ear) ?? 0) - under) * Math.min(1, dt * 3)
+    const open = 1 - under * 0.92
+    wind.gain.setTargetAtTime(Amb.wind * calm * open * (0.65 + 0.7 * gust), t, 0.4)
+    leaves.gain.setTargetAtTime(Amb.leaves * calm * open * (0.12 + 0.88 * trees) * (0.25 + 0.95 * gust * gust), t, 0.4)
+    rock.gain.setTargetAtTime(Amb.tunnel * under, t, 0.4)
+
+    if (under > 0.5) {
+      dripLeft -= dt
+      if (dripLeft <= 0) {
+        dripLeft = rnd(...Amb.drips)
+        sfx.drip(rnd(-0.6, 0.6), Math.random())
+      }
+    }
 
     callLeft -= dt
-    if (callLeft <= 0) {
+    if (callLeft <= 0 && under < 0.3) {
       callLeft = rnd(...Amb.calls)
       const pan = rnd(0.1, 0.65) * (Math.random() < 0.5 ? -1 : 1)
       if (night) sfx.owl(pan)
@@ -243,7 +261,33 @@ export function createSoundscape(yard) {
         z = spot.z
       }
     }
+    for (const run of air ? [air.tunnel, air.links] : []) {
+      if (!run.moving) continue
+      run.nearest(ear.x, ear.z, spot)
+      const k = nearness(spot.x, spot.y, spot.z, v.S.range)
+      if (k > best) {
+        best = k
+        x = spot.x
+        z = spot.z
+      }
+    }
     drive(v, best, x, z, best > 0, dt)
+  }
+
+  // The plane, on whichever of the two loops it runs, the other falling quiet. A plane never settles
+  // into the background the way a machine does, so `heard` is held at nothing.
+  function updatePlane(dt) {
+    const you = air?.planes.voice
+    for (const name of ['prop', 'jet']) {
+      const v = voices[name]
+      const on = !!you?.on && you.jet === (name === 'jet')
+      const k = on ? nearness(you.x, you.y, you.z, v.S.range) : 0
+      const hard = you?.throttle ?? 0
+      // The bigger the aircraft the louder and the lower.
+      const size = you?.size ?? 0
+      v.heard = 0
+      drive(v, k, you?.x ?? 0, you?.z ?? 0, k > 0, dt, (0.35 + 0.65 * hard) * (0.72 + 0.5 * size), (v.S.rate[0] + (v.S.rate[1] - v.S.rate[0]) * hard) * (1.14 - 0.3 * size))
+    }
   }
 
   // The truck heard is the loudest one: on the move a long way off, standing only right beside it.
@@ -292,6 +336,7 @@ export function createSoundscape(yard) {
       updateBelt(tick)
       updateTrucks(tick)
       updateTrain(tick)
+      updatePlane(tick)
       tick = 0
     },
     get voices() {

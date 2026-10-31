@@ -444,6 +444,151 @@ export function paintBanner(text, { fill = '#ffe15a', bg = '#a8892f', edge = '#3
   })
 }
 
+// The tunnel is unlit by anything real: its lamps' light is painted on. One repeat of a wall, a lamp's
+// pool of warm light on rough rock between two timber sets.
+export function paintTunnelWall() {
+  const W = 512
+  const H = 256
+  return liveTexture(W, H, (ctx) => {
+    ctx.fillStyle = '#231c1a'
+    ctx.fillRect(0, 0, W, H)
+    const rand = mulberry32(61)
+    for (let i = 0; i < 260; i++) {
+      const v = 26 + rand() * 34
+      ctx.fillStyle = `rgb(${v + 8},${v},${v - 6})`
+      ctx.beginPath()
+      ctx.ellipse(rand() * W, rand() * H, 8 + rand() * 34, 5 + rand() * 18, rand() * 3, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    const pool = ctx.createRadialGradient(W / 2, H * 0.1, 8, W / 2, H * 0.1, W * 0.52)
+    pool.addColorStop(0, 'rgba(255,196,110,0.82)')
+    pool.addColorStop(0.45, 'rgba(226,132,60,0.34)')
+    pool.addColorStop(1, 'rgba(90,40,20,0)')
+    ctx.fillStyle = pool
+    ctx.fillRect(0, 0, W, H)
+    const foot = ctx.createLinearGradient(0, H * 0.7, 0, H)
+    foot.addColorStop(0, 'rgba(0,0,0,0)')
+    foot.addColorStop(1, 'rgba(0,0,0,0.55)')
+    ctx.fillStyle = foot
+    ctx.fillRect(0, 0, W, H)
+  })
+}
+
+// One repeat of the floor: packed dirt with the lamp's light across it and a wet patch.
+export function paintTunnelFloor() {
+  const W = 256
+  const H = 256
+  return liveTexture(W, H, (ctx) => {
+    ctx.fillStyle = '#2c2422'
+    ctx.fillRect(0, 0, W, H)
+    const rand = mulberry32(62)
+    for (let i = 0; i < 420; i++) {
+      const v = 34 + rand() * 30
+      ctx.fillStyle = `rgba(${v + 10},${v + 2},${v - 6},0.8)`
+      ctx.fillRect(rand() * W, rand() * H, 1 + rand() * 5, 1 + rand() * 4)
+    }
+    const pool = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, W * 0.55)
+    pool.addColorStop(0, 'rgba(255,190,110,0.58)')
+    pool.addColorStop(1, 'rgba(120,60,30,0)')
+    ctx.fillStyle = pool
+    ctx.fillRect(0, 0, W, H)
+    ctx.fillStyle = 'rgba(150,180,210,0.14)'
+    ctx.beginPath()
+    ctx.ellipse(W * 0.66, H * 0.7, 46, 22, 0.4, 0, Math.PI * 2)
+    ctx.fill()
+  })
+}
+
+// One repeat of the roof: rough lagging boards running across, lit under each lamp.
+export function paintTunnelRoof() {
+  const W = 256
+  const H = 256
+  return liveTexture(W, H, (ctx) => {
+    ctx.fillStyle = '#1f1714'
+    ctx.fillRect(0, 0, W, H)
+    const rand = mulberry32(63)
+    for (let x = 0; x < W; x += 21) {
+      const v = 36 + rand() * 22
+      ctx.fillStyle = `rgb(${v + 12},${v},${v - 10})`
+      ctx.fillRect(x, 0, 18, H)
+    }
+    const pool = ctx.createRadialGradient(W / 2, H / 2, 4, W / 2, H / 2, W * 0.5)
+    pool.addColorStop(0, 'rgba(255,214,140,0.9)')
+    pool.addColorStop(0.5, 'rgba(226,140,70,0.28)')
+    pool.addColorStop(1, 'rgba(90,40,20,0)')
+    ctx.fillStyle = pool
+    ctx.fillRect(0, 0, W, H)
+  })
+}
+
+// Yellow and black, for edges that bite.
+export function paintHazard() {
+  const W = 256
+  const H = 32
+  return liveTexture(W, H, (ctx) => {
+    ctx.fillStyle = '#f2c21c'
+    ctx.fillRect(0, 0, W, H)
+    ctx.fillStyle = '#1b1c22'
+    for (let x = -H; x < W + H; x += 44) {
+      ctx.beginPath()
+      ctx.moveTo(x, H)
+      ctx.lineTo(x + 22, H)
+      ctx.lineTo(x + 22 + H, 0)
+      ctx.lineTo(x + H, 0)
+      ctx.fill()
+    }
+  })
+}
+
+// The airport fence's chain link: one diamond of wire on nothing, to repeat.
+export function paintChainLink() {
+  const W = 64
+  const H = 64
+  return liveTexture(W, H, (ctx) => {
+    ctx.strokeStyle = '#b4bbc4'
+    ctx.lineWidth = 3.2
+    ctx.beginPath()
+    for (const [ax, ay, bx, by] of [[0, H / 2, W / 2, 0], [W / 2, 0, W, H / 2], [W, H / 2, W / 2, H], [W / 2, H, 0, H / 2]]) {
+      ctx.moveTo(ax, ay)
+      ctx.lineTo(bx, by)
+    }
+    ctx.stroke()
+  })
+}
+
+// Lettering down a plane's side or a fin, on nothing.
+export function paintAirMark(text, fill, stroke, w = 768, h = 128) {
+  return liveTexture(w, h, (ctx) => {
+    const size = Math.min(h * 0.74, (w * 1.42) / text.length)
+    write(ctx, text, w / 2, h / 2, size, { fill, stroke, lw: size * 0.08, align: 'center', weight: 800 })
+  })
+}
+
+// A pine on the fin, the firm's mark.
+export function paintFinMark(fill) {
+  const S = 256
+  return liveTexture(S, S, (ctx) => {
+    ctx.fillStyle = fill
+    for (const [y, w] of [[34, 60], [86, 88], [140, 116]]) {
+      ctx.beginPath()
+      ctx.moveTo(S / 2, y - 26)
+      ctx.lineTo(S / 2 + w, y + 62)
+      ctx.lineTo(S / 2 - w, y + 62)
+      ctx.fill()
+    }
+    ctx.fillRect(S / 2 - 16, 200, 32, 40)
+  })
+}
+
+// Runway numbers and other paint on the ground: white on nothing.
+export function paintGroundText(text) {
+  const W = 256
+  const H = 256
+  return liveTexture(W, H, (ctx) => {
+    write(ctx, text, W / 2, H / 2, 220, { fill: '#f2f1ea', align: 'center' })
+  })
+}
+
 // How full a truck is, floating over its cab.
 export function paintLoadTag(text) {
   const W = 512

@@ -279,7 +279,7 @@ export function buildBoards(scene, remote = false) {
   const signs = new Map()
   for (const sign of YARD.saleSigns) {
     sign.cost = Number(sign.price.replace(/[^0-9]/g, ''))
-    saleSign(scene, sign, reg, signs)
+    if (!sign.panel && (!remote || !sign.own)) saleSign(scene, sign, reg, signs)
   }
   const updateLeaders = remote ? null : leaderboard(scene)
   return {
@@ -292,7 +292,7 @@ export function buildBoards(scene, remote = false) {
     hoverUpgradeButton: reg.hover,
     pressUpgradeButton: reg.press,
     refreshPrices: reg.refresh,
-    showSign: (id, on) => signs.get(id).show(on),
+    showSign: (id, on) => signs.get(id)?.show(on),
     // After an upgrade: the board faces and price tags read their rows again.
     repaint() {
       for (const f of faces) f.userData.paint()
