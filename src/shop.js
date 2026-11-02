@@ -2,11 +2,11 @@ import { SHOP, YARD } from './config.js'
 import { clock, shortMoney } from './hud.js'
 import { registerZone } from './interact.js'
 import { player } from './player.js'
-import { setUpgrade, upgradeLevel } from './stats.js'
+import { setUpgrade } from './stats.js'
 import * as sfx from './audio/sfx.js'
 
 // The Gem items that aren't windows: the Hacker and OP Truck rings, the HUD's Auto Chop, x2 Money
-// and Rush Hour. All cost money until Gems exist (SHOP). What is bought here survives a rebirth.
+// and Rush Hour. All cost money until Gems exist (SHOP). All but the OP Truck survive a rebirth.
 const OP_LEVEL = 4 // GAME.trucks.levels
 
 export function createShop({ yard, hud }) {
@@ -106,9 +106,10 @@ export function createShop({ yard, hud }) {
     get autoChop() {
       return autoChop
     },
-    // The rebirth's wipe: back to what was bought here. Call before the trucks are reset.
+    // The rebirth's wipe: the OP Truck goes with the trucks and is for sale again; the rest stays.
+    // Call before the trucks are reset.
     keep() {
-      if (owned.has('opTruck') && upgradeLevel('truckLevel') !== OP_LEVEL) setUpgrade('truckLevel', OP_LEVEL)
+      if (owned.delete('opTruck')) yard.plot?.setPerks([...owned])
       this.setBelts(1)
     },
     setBelts(k) {
