@@ -786,7 +786,7 @@ export function createPlanes(scene, { items, bursts, stats, trucks }) {
     // An item comes aboard and is paid for at wheels up: more than a truck pays, and at least AIR.log.
     take(item) {
       p.worth += Math.max(GAME.products[item.kind].value * AIR.premium, AIR.log) * item.mult * trucks.cash
-      if (!p.load) p.wait = AIR.patience
+      p.wait = AIR.patience // idle timeout: a plane that is still being fed keeps waiting
       p.load++
       tagTex.userData.paint()
     },
