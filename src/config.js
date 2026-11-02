@@ -588,7 +588,7 @@ export const AIR = {
   // The rebirths and the plane's full load bonus apply.
   premium: 1.5,
   log: 45,
-  patience: 30, // s after the first item before a plane goes with what it has (no full load bonus)
+  patience: 30, // s after the latest item before a plane goes with what it has (no full load bonus)
   tip: 0.12, // s between items leaving the bunker
 }
 
